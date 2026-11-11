@@ -1,0 +1,342 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+import '../../data/sasta_app_state.dart';
+import '../../models/models.dart';
+import '../../theme/sasta_theme.dart';
+import '../../theme/sasta_tokens.dart';
+import '../../widgets/sasta_background.dart';
+import '../../widgets/sasta_components.dart';
+import '../../widgets/sasta_mascot.dart';
+import '../../widgets/sasta_sheets.dart';
+
+class LocationsScreen extends StatelessWidget {
+  const LocationsScreen({super.key});
+
+  Future<void> _openAddLocationSheet(
+    BuildContext context, {
+    SavedLocation? existing,
+  }) async {
+    final state = SastaScope.read(context);
+    final labelCtrl = TextEditingController(text: existing?.label ?? '');
+    final pinCtrl = TextEditingController(text: existing?.pincode ?? '');
+    final areaCtrl = TextEditingController(text: existing?.area ?? '');
+    var makeDefault = existing?.isDefault ?? true;
+
+    await showSastaSheet(
+      context: context,
+      builder: (ctx) {
+        final palette = ctx.sasta;
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(22, 14, 22, 28),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    existing == null ? 'Add new location' : 'Edit location',
+                    style: SastaText.display(ctx, size: 22),
+                  ),
+                  const SizedBox(height: 14),
+                  _ModalField(controller: labelCtrl, hint: 'Label (e.g. Home, Work)'),
+                  const SizedBox(height: 10),
+                  _ModalField(
+                    controller: pinCtrl,
+                    hint: '6-digit pincode',
+                    digitsOnly: true,
+                    maxLength: 6,
+                  ),
+                  const SizedBox(height: 10),
+                  _ModalField(controller: areaCtrl, hint: 'City / Area'),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Set as default delivery address',
+                        style: SastaText.body(
+                          ctx,
+                          size: 14,
+                          weight: FontWeight.w600,
+                          color: palette.ink,
+                        ),
+                      ),
+                      SastaSwitch(
+                        value: makeDefault,
+                        onChanged: (v) => setModalState(() => makeDefault = v),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  SastaPrimaryButton(
+                    label: existing == null ? 'Save location' : 'Update location',
+                    onPressed: () {
+                      final pin = pinCtrl.text.trim();
+                      if (pin.length != 6) {
+                        showSastaToast(context, 'Enter a valid 6-digit pincode');
+                        return;
+                      }
+                      final label = labelCtrl.text.trim().isEmpty
+                          ? 'Saved place'
+                          : labelCtrl.text.trim();
+                      final area = areaCtrl.text.trim().isEmpty
+                          ? 'India'
+                          : areaCtrl.text.trim();
+                      if (existing == null) {
+                        state.addLocation(
+                          label: label,
+                          pincode: pin,
+                          area: area,
+                          makeDefault: makeDefault,
+                        );
+                      } else {
+                        state.updateLocation(
+                          existing.copyWith(
+                            label: label,
+                            pincode: pin,
+                            area: area,
+                            isDefault: makeDefault,
+                          ),
+                        );
+                        if (makeDefault) state.setDefaultLocation(existing.id);
+                      }
+                      Navigator.of(ctx).pop();
+                    },
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = SastaScope.of(context);
+    final palette = context.sasta;
+    final active = state.activeLocation;
+
+    return Scaffold(
+      body: SastaBackground(
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              SastaSpace.page,
+              14,
+              SastaSpace.page,
+              SastaSpace.bottomMargin,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const SastaHeaderBar(title: 'Manage locations'),
+                const SizedBox(height: 18),
+                SastaCard(
+                  color: palette.mint,
+                  shadow: false,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Delivering to ${active.pincode}',
+                              style: SastaText.display(
+                                context,
+                                size: 22,
+                                color: palette.successText,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '${active.label} · ${active.area}',
+                              style: SastaText.body(
+                                context,
+                                size: 13,
+                                weight: FontWeight.w600,
+                                color: palette.successText,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SastaMascot(
+                        size: 62,
+                        color: SastaColors.gold,
+                        expression: MascotExpression.joy,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text('SAVED LOCATIONS', style: SastaText.eyebrow(context)),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: ListView.separated(
+                    physics: const BouncingScrollPhysics(),
+                    itemCount: state.locations.length,
+                    separatorBuilder: (_, _) =>
+                        Divider(height: 10, color: palette.divider),
+                    itemBuilder: (context, i) {
+                      final loc = state.locations[i];
+                      return InkWell(
+                        onTap: () {
+                          state.setDefaultLocation(loc.id);
+                          showSastaToast(
+                            context,
+                            'Switched delivery to ${loc.pincode}',
+                          );
+                        },
+                        borderRadius: BorderRadius.circular(18),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  color: loc.isDefault
+                                      ? palette.mint
+                                      : palette.field,
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: Icon(
+                                  Icons.location_on_outlined,
+                                  color: loc.isDefault
+                                      ? palette.successText
+                                      : palette.muted,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Text(
+                                          loc.label,
+                                          style: SastaText.body(
+                                            context,
+                                            size: 15,
+                                            weight: FontWeight.w700,
+                                          ),
+                                        ),
+                                        if (loc.isDefault) ...[
+                                          const SizedBox(width: 8),
+                                          SastaTag(
+                                            label: 'Default',
+                                            backgroundColor: palette.mint,
+                                            textColor: palette.successText,
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                    Text(
+                                      '${loc.pincode} · ${loc.area}',
+                                      style: SastaText.muted(context, size: 12),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              IconButton(
+                                onPressed: () => _openAddLocationSheet(
+                                  context,
+                                  existing: loc,
+                                ),
+                                icon: Icon(
+                                  Icons.edit_outlined,
+                                  size: 19,
+                                  color: palette.muted,
+                                ),
+                              ),
+                              if (state.locations.length > 1)
+                                IconButton(
+                                  onPressed: () => state.deleteLocation(loc.id),
+                                  icon: Icon(
+                                    Icons.delete_outline_rounded,
+                                    size: 19,
+                                    color: palette.dangerText,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SastaPrimaryButton(
+                  label: 'Add new location',
+                  onPressed: () => _openAddLocationSheet(context),
+                ),
+                const SizedBox(height: 8),
+                SastaOutlineButton(
+                  label: 'Detect current location',
+                  height: 48,
+                  onPressed: () {
+                    state.setDefaultLocation(state.locations.first.id);
+                    showSastaToast(
+                      context,
+                      'Location set to ${state.activeLocation.pincode}',
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ModalField extends StatelessWidget {
+  const _ModalField({
+    required this.controller,
+    required this.hint,
+    this.digitsOnly = false,
+    this.maxLength,
+  });
+
+  final TextEditingController controller;
+  final String hint;
+  final bool digitsOnly;
+  final int? maxLength;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.sasta;
+    return Container(
+      height: 52,
+      padding: const EdgeInsets.symmetric(horizontal: 18),
+      decoration: BoxDecoration(
+        color: palette.field,
+        borderRadius: BorderRadius.circular(26),
+      ),
+      alignment: Alignment.center,
+      child: TextField(
+        controller: controller,
+        keyboardType: digitsOnly ? TextInputType.number : TextInputType.text,
+        inputFormatters: [
+          if (digitsOnly) FilteringTextInputFormatter.digitsOnly,
+          if (maxLength != null) LengthLimitingTextInputFormatter(maxLength),
+        ],
+        style: SastaText.body(context, size: 15, weight: FontWeight.w600),
+        decoration: InputDecoration(
+          border: InputBorder.none,
+          isDense: true,
+          hintText: hint,
+          hintStyle: SastaText.muted(context, size: 14),
+        ),
+      ),
+    );
+  }
+}
