@@ -299,12 +299,15 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                           SastaSpace.page,
                           SastaSpace.bottomMargin,
                         ),
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: 2,
                           mainAxisSpacing: 12,
                           crossAxisSpacing: 12,
-                          childAspectRatio: 0.65,
+                          mainAxisExtent: 192 +
+                              34 *
+                                  MediaQuery.textScalerOf(context)
+                                      .scale(1.0)
+                                      .clamp(1.0, 2.0),
                         ),
                         itemCount: results.length,
                         itemBuilder: (context, i) {

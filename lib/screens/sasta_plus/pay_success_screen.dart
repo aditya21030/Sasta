@@ -53,6 +53,9 @@ class _PaySuccessScreenState extends State<PaySuccessScreen>
     final planName = isYearly ? 'Sasta+ Yearly' : 'Sasta+ Monthly';
     final nextRenewal = isYearly ? '8 Nov 2027' : '8 Dec 2026';
 
+    final screenHeight = MediaQuery.sizeOf(context).height;
+    final mascotSize = screenHeight < 640 ? 92.0 : 120.0;
+
     return Scaffold(
       body: SastaBackground(
         child: Stack(
@@ -69,95 +72,104 @@ class _PaySuccessScreenState extends State<PaySuccessScreen>
                 ),
               ),
             SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  SastaSpace.page,
-                  20,
-                  SastaSpace.page,
-                  SastaSpace.bottomMargin,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const Spacer(),
-                    FadeUp(
+              child: CustomScrollView(
+                physics: const BouncingScrollPhysics(),
+                slivers: [
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        SastaSpace.page,
+                        20,
+                        SastaSpace.page,
+                        SastaSpace.bottomMargin,
+                      ),
                       child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          FloatBob(
-                            amplitude: 6,
-                            child: SastaMascot(
-                              size: 120,
-                              color: SastaColors.gold,
-                              expression: MascotExpression.joy,
-                              hasCrown: true,
-                              haloColor: palette.butter,
+                          const Spacer(),
+                          FadeUp(
+                            child: Column(
+                              children: [
+                                FloatBob(
+                                  amplitude: 6,
+                                  child: SastaMascot(
+                                    size: mascotSize,
+                                    color: SastaColors.gold,
+                                    expression: MascotExpression.joy,
+                                    hasCrown: true,
+                                    haloColor: palette.butter,
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'You’re on Sasta+!',
+                                  style: SastaText.display(context, size: 34),
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Payment received. Your premium tools are ready.',
+                                  style: SastaText.muted(context, size: 15),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          FadeUp(
+                            delay: const Duration(milliseconds: 90),
+                            child: SastaCard(
+                              color: palette.lavender,
+                              shadow: false,
+                              child: Column(
+                                children: [
+                                  _InfoRow(label: 'Plan', value: planName),
+                                  const SizedBox(height: 10),
+                                  const _InfoRow(
+                                    label: 'Started',
+                                    value: '8 Nov 2026',
+                                  ),
+                                  const SizedBox(height: 10),
+                                  _InfoRow(
+                                    label: 'Next renewal',
+                                    value: nextRenewal,
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                           const SizedBox(height: 18),
-                          Text(
-                            'You’re on Sasta+!',
-                            style: SastaText.display(context, size: 36),
-                            textAlign: TextAlign.center,
+                          const Spacer(),
+                          SastaPrimaryButton(
+                            label: 'Start using Sasta+',
+                            onPressed: _backToHome,
                           ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Payment received. Your premium tools are ready.',
-                            style: SastaText.muted(context, size: 15),
-                            textAlign: TextAlign.center,
+                          const SizedBox(height: 10),
+                          SastaOutlineButton(
+                            label: 'View membership',
+                            onPressed: () => Navigator.of(context)
+                                .pushReplacementNamed(SastaRouteNames.plusManage),
+                          ),
+                          const SizedBox(height: 4),
+                          Center(
+                            child: TextButton(
+                              onPressed: _backToHome,
+                              child: Text(
+                                'Back to Home',
+                                style: SastaText.body(
+                                  context,
+                                  size: 14,
+                                  weight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 26),
-                    FadeUp(
-                      delay: const Duration(milliseconds: 90),
-                      child: SastaCard(
-                        color: palette.lavender,
-                        shadow: false,
-                        child: Column(
-                          children: [
-                            _InfoRow(label: 'Plan', value: planName),
-                            const SizedBox(height: 10),
-                            const _InfoRow(
-                              label: 'Started',
-                              value: '8 Nov 2026',
-                            ),
-                            const SizedBox(height: 10),
-                            _InfoRow(
-                              label: 'Next renewal',
-                              value: nextRenewal,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const Spacer(),
-                    SastaPrimaryButton(
-                      label: 'Start using Sasta+',
-                      onPressed: _backToHome,
-                    ),
-                    const SizedBox(height: 10),
-                    SastaOutlineButton(
-                      label: 'View membership',
-                      onPressed: () => Navigator.of(context)
-                          .pushReplacementNamed(SastaRouteNames.plusManage),
-                    ),
-                    const SizedBox(height: 4),
-                    Center(
-                      child: TextButton(
-                        onPressed: _backToHome,
-                        child: Text(
-                          'Back to Home',
-                          style: SastaText.body(
-                            context,
-                            size: 14,
-                            weight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -179,12 +191,16 @@ class _InfoRow extends StatelessWidget {
         Expanded(
           child: Text(label, style: SastaText.muted(context, size: 14)),
         ),
-        Text(
-          value,
-          style: SastaText.body(
-            context,
-            size: 14,
-            weight: FontWeight.w800,
+        const SizedBox(width: 12),
+        Flexible(
+          child: Text(
+            value,
+            textAlign: TextAlign.end,
+            style: SastaText.body(
+              context,
+              size: 14,
+              weight: FontWeight.w800,
+            ),
           ),
         ),
       ],

@@ -25,10 +25,20 @@ Future<T?> showSastaSheet<T>({
         top: Radius.circular(SastaRadius.sheet),
       ),
     ),
-    builder: (ctx) => Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-      child: builder(ctx),
-    ),
+    builder: (ctx) {
+      final bottomInset = MediaQuery.of(ctx).viewInsets.bottom;
+      final maxHeight = MediaQuery.sizeOf(ctx).height * 0.9;
+      return ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: maxHeight),
+        child: SingleChildScrollView(
+          padding: EdgeInsets.only(bottom: bottomInset),
+          child: SafeArea(
+            top: false,
+            child: builder(ctx),
+          ),
+        ),
+      );
+    },
   );
 }
 
@@ -114,11 +124,20 @@ Future<void> showCreatePriceAlertSheet(
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      'Notify me below',
-                      style: SastaText.body(ctx, size: 15, weight: FontWeight.w700),
+                    Expanded(
+                      child: Text(
+                        'Notify me below',
+                        style: SastaText.body(ctx, size: 15, weight: FontWeight.w700),
+                      ),
                     ),
-                    PriceGradientText('₹$target', size: 30),
+                    const SizedBox(width: 12),
+                    Flexible(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerRight,
+                        child: PriceGradientText('₹$target', size: 30),
+                      ),
+                    ),
                   ],
                 ),
                 Slider(
@@ -298,7 +317,12 @@ Future<void> showMonthlySavingsSheet(BuildContext context) async {
                             color: SastaColors.ink,
                           ),
                         ),
-                        const PriceGradientText('₹312', size: 42),
+                        const SizedBox(height: 2),
+                        const FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: PriceGradientText('₹312', size: 42),
+                        ),
                         Text(
                           '16% higher than Oct (₹268)',
                           style: SastaText.body(
@@ -367,7 +391,15 @@ class _SavingsBarRow extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(label, style: SastaText.body(context, size: 13, weight: FontWeight.w600)),
+            Expanded(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: SastaText.body(context, size: 13, weight: FontWeight.w600),
+              ),
+            ),
+            const SizedBox(width: 12),
             Text(value, style: SastaText.body(context, size: 13, weight: FontWeight.w800)),
           ],
         ),

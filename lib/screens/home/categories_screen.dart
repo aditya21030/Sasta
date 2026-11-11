@@ -83,12 +83,15 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                           SastaSpace.page,
                           SastaSpace.bottomMargin,
                         ),
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: 3,
                           mainAxisSpacing: 10,
                           crossAxisSpacing: 10,
-                          childAspectRatio: 0.88,
+                          mainAxisExtent: 74 +
+                              34 *
+                                  MediaQuery.textScalerOf(context)
+                                      .scale(1.0)
+                                      .clamp(1.0, 2.0),
                         ),
                         itemCount: filtered.length,
                         itemBuilder: (context, index) {

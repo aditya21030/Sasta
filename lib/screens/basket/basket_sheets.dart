@@ -150,76 +150,86 @@ Future<void> showBasketShareSheet(BuildContext context) async {
             ),
             const SizedBox(height: 16),
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _ShareTile(
-                  label: 'WhatsApp',
-                  icon: Icons.chat_bubble_outline_rounded,
-                  bg: palette.mint,
-                  fg: palette.successText,
-                  onTap: () async {
-                    Navigator.of(ctx).pop();
-                    final ok = await state.shareService.shareToWhatsApp(
-                      formattedText,
-                      subject: '${basket.name} — Sasta',
-                    );
-                    if (!context.mounted) return;
-                    showSastaToast(
-                      context,
-                      ok
-                          ? 'Sharing ${basket.name} on WhatsApp'
-                          : 'List copied for WhatsApp sharing',
-                    );
-                  },
+                Expanded(
+                  child: _ShareTile(
+                    label: 'WhatsApp',
+                    icon: Icons.chat_bubble_outline_rounded,
+                    bg: palette.mint,
+                    fg: palette.successText,
+                    onTap: () async {
+                      Navigator.of(ctx).pop();
+                      final ok = await state.shareService.shareToWhatsApp(
+                        formattedText,
+                        subject: '${basket.name} — Sasta',
+                      );
+                      if (!context.mounted) return;
+                      showSastaToast(
+                        context,
+                        ok
+                            ? 'Sharing ${basket.name} on WhatsApp'
+                            : 'List copied for WhatsApp sharing',
+                      );
+                    },
+                  ),
                 ),
-                _ShareTile(
-                  label: 'Copy list',
-                  icon: Icons.copy_rounded,
-                  bg: palette.lavender,
-                  fg: palette.lavenderText,
-                  onTap: () {
-                    Clipboard.setData(ClipboardData(text: formattedText));
-                    Navigator.of(ctx).pop();
-                    showSastaToast(context, 'Shopping list copied to clipboard');
-                  },
+                const SizedBox(width: 6),
+                Expanded(
+                  child: _ShareTile(
+                    label: 'Copy list',
+                    icon: Icons.copy_rounded,
+                    bg: palette.lavender,
+                    fg: palette.lavenderText,
+                    onTap: () {
+                      Clipboard.setData(ClipboardData(text: formattedText));
+                      Navigator.of(ctx).pop();
+                      showSastaToast(context, 'Shopping list copied to clipboard');
+                    },
+                  ),
                 ),
-                _ShareTile(
-                  label: 'Export',
-                  icon: Icons.file_upload_outlined,
-                  bg: palette.sky,
-                  fg: palette.skyText,
-                  onTap: () async {
-                    Navigator.of(ctx).pop();
-                    final ok = await state.shareService.shareText(
-                      formattedText,
-                      subject: '${basket.name} — Sasta Basket',
-                    );
-                    if (!context.mounted) return;
-                    showSastaToast(
-                      context,
-                      ok ? 'Exported shopping list' : 'List copied for export',
-                    );
-                  },
+                const SizedBox(width: 6),
+                Expanded(
+                  child: _ShareTile(
+                    label: 'Export',
+                    icon: Icons.file_upload_outlined,
+                    bg: palette.sky,
+                    fg: palette.skyText,
+                    onTap: () async {
+                      Navigator.of(ctx).pop();
+                      final ok = await state.shareService.shareText(
+                        formattedText,
+                        subject: '${basket.name} — Sasta Basket',
+                      );
+                      if (!context.mounted) return;
+                      showSastaToast(
+                        context,
+                        ok ? 'Exported shopping list' : 'List copied for export',
+                      );
+                    },
+                  ),
                 ),
-                _ShareTile(
-                  label: 'Print',
-                  icon: Icons.print_outlined,
-                  bg: palette.peach,
-                  fg: palette.linkText,
-                  onTap: () async {
-                    Navigator.of(ctx).pop();
-                    final ok = await state.shareService.shareText(
-                      formattedText,
-                      subject: 'Print ${basket.name}',
-                    );
-                    if (!context.mounted) return;
-                    showSastaToast(
-                      context,
-                      ok
-                          ? 'Opened print & share options'
-                          : 'Print summary copied to clipboard',
-                    );
-                  },
+                const SizedBox(width: 6),
+                Expanded(
+                  child: _ShareTile(
+                    label: 'Print',
+                    icon: Icons.print_outlined,
+                    bg: palette.peach,
+                    fg: palette.linkText,
+                    onTap: () async {
+                      Navigator.of(ctx).pop();
+                      final ok = await state.shareService.shareText(
+                        formattedText,
+                        subject: 'Print ${basket.name}',
+                      );
+                      if (!context.mounted) return;
+                      showSastaToast(
+                        context,
+                        ok
+                            ? 'Opened print & share options'
+                            : 'Print summary copied to clipboard',
+                      );
+                    },
+                  ),
                 ),
               ],
             ),
@@ -270,18 +280,21 @@ class _ShareTile extends StatelessWidget {
       child: Column(
         children: [
           Container(
-            width: 56,
-            height: 56,
+            width: 52,
+            height: 52,
             decoration: BoxDecoration(
               color: bg,
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(18),
             ),
             alignment: Alignment.center,
-            child: Icon(icon, color: fg, size: 24),
+            child: Icon(icon, color: fg, size: 22),
           ),
           const SizedBox(height: 6),
           Text(
             label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
             style: SastaText.body(context, size: 12, weight: FontWeight.w700),
           ),
         ],

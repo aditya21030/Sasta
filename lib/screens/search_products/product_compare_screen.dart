@@ -139,12 +139,14 @@ class ProductCompareScreen extends StatelessWidget {
                           delay: const Duration(milliseconds: 60),
                           child: Row(
                             children: [
-                              SastaTag(
-                                label: 'Cheapest right now',
-                                backgroundColor: palette.mint,
-                                textColor: palette.successText,
+                              Flexible(
+                                child: SastaTag(
+                                  label: 'Cheapest right now',
+                                  backgroundColor: palette.mint,
+                                  textColor: palette.successText,
+                                ),
                               ),
-                              const Spacer(),
+                              const SizedBox(width: 8),
                               Text(
                                 cheapest.retailer.eta,
                                 style: SastaText.muted(context, size: 12),
@@ -197,9 +199,16 @@ class ProductCompareScreen extends StatelessWidget {
                                       ],
                                     ),
                                   ),
-                                  PriceGradientText(
-                                    '₹${cheapest.price}',
-                                    size: 46,
+                                  const SizedBox(width: 12),
+                                  Flexible(
+                                    child: FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      alignment: Alignment.centerRight,
+                                      child: PriceGradientText(
+                                        '₹${cheapest.price}',
+                                        size: 46,
+                                      ),
+                                    ),
                                   ),
                                 ],
                               ),

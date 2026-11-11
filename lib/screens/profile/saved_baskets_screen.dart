@@ -104,40 +104,58 @@ class SavedBasketsScreen extends StatelessWidget {
                             const SizedBox(height: 14),
                             Row(
                               children: [
-                                SastaChip(
-                                  label: 'Compare',
-                                  selected: true,
-                                  height: 40,
-                                  onTap: () => SastaNav.openBasketCompare(
-                                    context,
-                                    customEntries: basket.entries,
+                                Expanded(
+                                  child: Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: SastaChip(
+                                      label: 'Compare',
+                                      selected: true,
+                                      height: 40,
+                                      onTap: () => SastaNav.openBasketCompare(
+                                        context,
+                                        customEntries: basket.entries,
+                                      ),
+                                    ),
                                   ),
                                 ),
-                                const Spacer(),
-                                _MiniActionCircle(
-                                  icon: Icons.edit_outlined,
-                                  tooltip: 'Rename basket',
-                                  onTap: () =>
-                                      showRenameBasketDialog(context, basket),
-                                ),
-                                const SizedBox(width: 6),
-                                _MiniActionCircle(
-                                  icon: Icons.copy_rounded,
-                                  tooltip: 'Duplicate basket',
-                                  onTap: () {
-                                    state.duplicateBasket(basket.id);
-                                    showSastaToast(context, 'Basket duplicated');
-                                  },
-                                ),
-                                const SizedBox(width: 6),
-                                _MiniActionCircle(
-                                  icon: Icons.delete_outline_rounded,
-                                  tooltip: 'Delete basket',
-                                  iconColor: palette.dangerText,
-                                  onTap: () {
-                                    state.deleteBasket(basket.id);
-                                    showSastaToast(context, 'Basket removed');
-                                  },
+                                const SizedBox(width: 8),
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    _MiniActionCircle(
+                                      icon: Icons.edit_outlined,
+                                      tooltip: 'Rename basket',
+                                      onTap: () => showRenameBasketDialog(
+                                        context,
+                                        basket,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    _MiniActionCircle(
+                                      icon: Icons.copy_rounded,
+                                      tooltip: 'Duplicate basket',
+                                      onTap: () {
+                                        state.duplicateBasket(basket.id);
+                                        showSastaToast(
+                                          context,
+                                          'Basket duplicated',
+                                        );
+                                      },
+                                    ),
+                                    const SizedBox(width: 6),
+                                    _MiniActionCircle(
+                                      icon: Icons.delete_outline_rounded,
+                                      tooltip: 'Delete basket',
+                                      iconColor: palette.dangerText,
+                                      onTap: () {
+                                        state.deleteBasket(basket.id);
+                                        showSastaToast(
+                                          context,
+                                          'Basket removed',
+                                        );
+                                      },
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),

@@ -124,28 +124,36 @@ class SubHistoryScreen extends StatelessWidget {
                           style: SastaText.muted(context, size: 13),
                         ),
                         const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            _StatusTag(status: invoice.status),
-                            const Spacer(),
-                            TextButton(
-                              onPressed: () =>
-                                  _showInvoiceSheet(context, invoice),
-                              style: TextButton.styleFrom(
-                                padding: EdgeInsets.zero,
-                                minimumSize: const Size(44, 36),
-                              ),
-                              child: Text(
-                                'View invoice',
-                                style: SastaText.body(
-                                  context,
-                                  size: 13,
-                                  weight: FontWeight.w700,
-                                  decoration: TextDecoration.underline,
+                        SizedBox(
+                          width: double.infinity,
+                          child: Wrap(
+                            alignment: WrapAlignment.spaceBetween,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 8,
+                            runSpacing: 4,
+                            children: [
+                              _StatusTag(status: invoice.status),
+                              TextButton(
+                                onPressed: () =>
+                                    _showInvoiceSheet(context, invoice),
+                                style: TextButton.styleFrom(
+                                  padding: EdgeInsets.zero,
+                                  minimumSize: const Size(44, 36),
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                child: Text(
+                                  'View invoice',
+                                  style: SastaText.body(
+                                    context,
+                                    size: 13,
+                                    weight: FontWeight.w700,
+                                    decoration: TextDecoration.underline,
+                                  ),
                                 ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ],
                     ),

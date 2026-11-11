@@ -198,17 +198,23 @@ class _ThemeOptionCard extends StatelessWidget {
                   if (selected) ...[
                     Icon(
                       Icons.check_circle_rounded,
-                      size: 16,
+                      size: 15,
                       color: palette.ink,
                     ),
                     const SizedBox(width: 4),
                   ],
-                  Text(
-                    label,
-                    style: SastaText.body(
-                      context,
-                      size: 13,
-                      weight: FontWeight.w700,
+                  Flexible(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        label,
+                        maxLines: 1,
+                        style: SastaText.body(
+                          context,
+                          size: 13,
+                          weight: FontWeight.w700,
+                        ),
+                      ),
                     ),
                   ),
                 ],

@@ -139,29 +139,42 @@ class SastaHeaderBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       height: SastaSizes.iconButton,
-      child: Row(
-        children: [
-          if (showBack)
-            SastaBackButton(onPressed: onBack)
-          else
-            const SizedBox(width: SastaSizes.iconButton),
-          Expanded(
-            child: title != null
-                ? Text(
-                    title!,
-                    textAlign: TextAlign.center,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: SastaText.body(
-                      context,
-                      size: 16,
-                      weight: FontWeight.w700,
-                    ),
-                  )
-                : const SizedBox.shrink(),
-          ),
-          trailing ?? const SizedBox(width: SastaSizes.iconButton),
-        ],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final maxTrailing =
+              (constraints.maxWidth - SastaSizes.iconButton - (title != null ? 64 : 8))
+                  .clamp(48.0, constraints.maxWidth);
+          return Row(
+            children: [
+              if (showBack)
+                SastaBackButton(onPressed: onBack)
+              else
+                const SizedBox(width: SastaSizes.iconButton),
+              Expanded(
+                child: title != null
+                    ? Text(
+                        title!,
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: SastaText.body(
+                          context,
+                          size: 16,
+                          weight: FontWeight.w700,
+                        ),
+                      )
+                    : const SizedBox.shrink(),
+              ),
+              if (trailing != null)
+                ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: maxTrailing),
+                  child: trailing!,
+                )
+              else
+                const SizedBox(width: SastaSizes.iconButton),
+            ],
+          );
+        },
       ),
     );
   }
@@ -1157,7 +1170,7 @@ class BasketFloatingBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.fromLTRB(SastaSpace.page, 0, SastaSpace.page, 10),
-      padding: const EdgeInsets.fromLTRB(18, 10, 10, 10),
+      padding: const EdgeInsets.fromLTRB(16, 10, 10, 10),
       decoration: BoxDecoration(
         color: SastaColors.ink,
         borderRadius: BorderRadius.circular(32),
@@ -1172,39 +1185,55 @@ class BasketFloatingBar extends StatelessWidget {
               children: [
                 Text(
                   '$productCount products · estimate',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
                     color: Colors.white.withValues(alpha: 0.72),
                   ),
                 ),
-                Text(
-                  '~₹$estimateTotal',
-                  style: SastaText.display(
-                    context,
-                    size: 22,
-                    color: Colors.white,
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    '~₹$estimateTotal',
+                    maxLines: 1,
+                    style: SastaText.display(
+                      context,
+                      size: 22,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
               ],
             ),
           ),
-          Material(
-            color: SastaColors.gold,
-            borderRadius: BorderRadius.circular(24),
-            child: InkWell(
-              onTap: onCompare,
+          const SizedBox(width: 8),
+          Flexible(
+            child: Material(
+              color: SastaColors.gold,
               borderRadius: BorderRadius.circular(24),
-              child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
-                child: Text(
-                  'Compare basket',
-                  style: SastaText.body(
-                    context,
-                    size: 14,
-                    weight: FontWeight.w800,
-                    color: SastaColors.ink,
+              child: InkWell(
+                onTap: onCompare,
+                borderRadius: BorderRadius.circular(24),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      'Compare basket',
+                      maxLines: 1,
+                      style: SastaText.body(
+                        context,
+                        size: 14,
+                        weight: FontWeight.w800,
+                        color: SastaColors.ink,
+                      ),
+                    ),
                   ),
                 ),
               ),

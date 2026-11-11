@@ -86,13 +86,19 @@ class _PlusLandingScreenState extends State<PlusLandingScreen> {
                 const SizedBox(height: 22),
                 FadeUp(
                   delay: const Duration(milliseconds: 60),
-                  child: GridView.count(
+                  child: GridView(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    crossAxisCount: 2,
-                    mainAxisSpacing: 12,
-                    crossAxisSpacing: 12,
-                    childAspectRatio: 1.08,
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      mainAxisSpacing: 12,
+                      crossAxisSpacing: 12,
+                      mainAxisExtent: 116 +
+                          44 *
+                              MediaQuery.textScalerOf(context)
+                                  .scale(1.0)
+                                  .clamp(1.0, 2.0),
+                    ),
                     children: [
                       _BenefitCard(
                         color: palette.sky,
@@ -443,16 +449,17 @@ class _CompactPlanTile extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          Wrap(
+            spacing: 6,
+            runSpacing: 4,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Expanded(
-                child: Text(
-                  title,
-                  style: SastaText.body(
-                    context,
-                    size: 14,
-                    weight: FontWeight.w800,
-                  ),
+              Text(
+                title,
+                style: SastaText.body(
+                  context,
+                  size: 14,
+                  weight: FontWeight.w800,
                 ),
               ),
               if (badge != null)
@@ -464,9 +471,13 @@ class _CompactPlanTile extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          Text(
-            price,
-            style: SastaText.display(context, size: 28),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              price,
+              style: SastaText.display(context, size: 28),
+            ),
           ),
           const SizedBox(height: 2),
           Text(caption, style: SastaText.muted(context, size: 12)),

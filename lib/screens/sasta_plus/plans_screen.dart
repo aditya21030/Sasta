@@ -241,20 +241,21 @@ class _PlanOptionCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       Text(
                         title,
                         style: SastaText.display(context, size: 22),
                       ),
-                      if (badge != null) ...[
-                        const SizedBox(width: 8),
+                      if (badge != null)
                         SastaTag(
                           label: badge!,
                           backgroundColor: SastaColors.gold,
                           textColor: SastaColors.ink,
                         ),
-                      ],
                     ],
                   ),
                   const SizedBox(height: 6),
@@ -262,14 +263,24 @@ class _PlanOptionCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.baseline,
                     textBaseline: TextBaseline.alphabetic,
                     children: [
-                      Text(
-                        price,
-                        style: SastaText.display(context, size: 32),
+                      Flexible(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            price,
+                            style: SastaText.display(context, size: 32),
+                          ),
+                        ),
                       ),
                       const SizedBox(width: 4),
-                      Text(
-                        unit,
-                        style: SastaText.muted(context, size: 13),
+                      Flexible(
+                        child: Text(
+                          unit,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: SastaText.muted(context, size: 13),
+                        ),
                       ),
                     ],
                   ),

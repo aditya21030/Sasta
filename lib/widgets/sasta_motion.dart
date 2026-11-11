@@ -256,15 +256,24 @@ class _AnimatedPriceLineChartState extends State<AnimatedPriceLineChart>
           Padding(
             padding: const EdgeInsets.only(left: 36, right: 8),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  widget.startLabel,
-                  style: SastaText.muted(context, size: 12),
+                Expanded(
+                  child: Text(
+                    widget.startLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: SastaText.muted(context, size: 12),
+                  ),
                 ),
-                Text(
-                  widget.endLabel,
-                  style: SastaText.muted(context, size: 12),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    widget.endLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.end,
+                    style: SastaText.muted(context, size: 12),
+                  ),
                 ),
               ],
             ),

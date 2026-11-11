@@ -154,12 +154,15 @@ class _HelpCentreScreenState extends State<HelpCentreScreen> {
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     itemCount: filtered.length,
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 2,
                       mainAxisSpacing: 12,
                       crossAxisSpacing: 12,
-                      childAspectRatio: 1.06,
+                      mainAxisExtent: 112 +
+                          44 *
+                              MediaQuery.textScalerOf(context)
+                                  .scale(1.0)
+                                  .clamp(1.0, 2.0),
                     ),
                     itemBuilder: (context, index) {
                       final topic = filtered[index];

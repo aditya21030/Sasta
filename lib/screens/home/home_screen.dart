@@ -198,7 +198,11 @@ class HomeScreen extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             SizedBox(
-              height: 122,
+              height: 98 +
+                  26 *
+                      MediaQuery.textScalerOf(context)
+                          .scale(1.0)
+                          .clamp(1.0, 1.8),
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 physics: const BouncingScrollPhysics(),
@@ -529,7 +533,9 @@ class _BestDealsSection extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         SizedBox(
-          height: 228,
+          height: 198 +
+              30 *
+                  MediaQuery.textScalerOf(context).scale(1.0).clamp(1.0, 1.8),
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),
@@ -577,7 +583,9 @@ class _TrendingSection extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         SizedBox(
-          height: 226,
+          height: 196 +
+              30 *
+                  MediaQuery.textScalerOf(context).scale(1.0).clamp(1.0, 1.8),
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),
@@ -617,7 +625,9 @@ class _PricesDroppedSection extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         SizedBox(
-          height: 196,
+          height: 170 +
+              26 *
+                  MediaQuery.textScalerOf(context).scale(1.0).clamp(1.0, 1.8),
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),
@@ -1008,13 +1018,16 @@ class _HomeSavingsCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
+                SizedBox(
+                  width: double.infinity,
+                  child: Wrap(
+                    alignment: WrapAlignment.spaceBetween,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 8,
+                    runSpacing: 2,
+                    children: [
+                      Text(
                         'Your savings',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                         style: SastaText.body(
                           context,
                           size: 14,
@@ -1022,21 +1035,24 @@ class _HomeSavingsCard extends StatelessWidget {
                           color: SastaColors.ink,
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Full report →',
-                      style: SastaText.body(
-                        context,
-                        size: 12,
-                        weight: FontWeight.w700,
-                        color: SastaColors.link,
+                      Text(
+                        'Full report →',
+                        style: SastaText.body(
+                          context,
+                          size: 12,
+                          weight: FontWeight.w700,
+                          color: SastaColors.link,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 4),
-                const PriceGradientText('₹312', size: 42),
+                const FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: PriceGradientText('₹312', size: 42),
+                ),
                 Text(
                   'Most economical so far: Zepto\nEstimated, not confirmed purchases',
                   style: SastaText.body(
@@ -1118,9 +1134,16 @@ class _HomePriceAlertsCard extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(width: 8),
-                            Text(
-                              '₹$current → target ₹${alert.targetPrice}',
-                              style: SastaText.muted(context, size: 12),
+                            Flexible(
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.centerRight,
+                                child: Text(
+                                  '₹$current → target ₹${alert.targetPrice}',
+                                  maxLines: 1,
+                                  style: SastaText.muted(context, size: 12),
+                                ),
+                              ),
                             ),
                           ],
                         ),

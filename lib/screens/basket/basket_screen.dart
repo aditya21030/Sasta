@@ -159,7 +159,10 @@ class BasketScreen extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 10),
-              Row(
+              Wrap(
+                spacing: 10,
+                runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   Material(
                     color: Colors.transparent,
@@ -179,12 +182,16 @@ class BasketScreen extends StatelessWidget {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text(
-                              '${basket.name} ▾',
-                              style: SastaText.body(
-                                context,
-                                size: 13,
-                                weight: FontWeight.w700,
+                            Flexible(
+                              child: Text(
+                                '${basket.name} ▾',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: SastaText.body(
+                                  context,
+                                  size: 13,
+                                  weight: FontWeight.w700,
+                                ),
                               ),
                             ),
                           ],
@@ -192,12 +199,9 @@ class BasketScreen extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      '${basket.uniqueProducts} products · ${basket.totalItems} items',
-                      style: SastaText.muted(context, size: 13),
-                    ),
+                  Text(
+                    '${basket.uniqueProducts} products · ${basket.totalItems} items',
+                    style: SastaText.muted(context, size: 13),
                   ),
                 ],
               ),
@@ -232,7 +236,14 @@ class BasketScreen extends StatelessWidget {
                                       color: palette.muted,
                                     ),
                                   ),
-                                  PriceGradientText('~₹$cheapestTotal', size: 40),
+                                  FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.centerLeft,
+                                    child: PriceGradientText(
+                                      '~₹$cheapestTotal',
+                                      size: 40,
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),

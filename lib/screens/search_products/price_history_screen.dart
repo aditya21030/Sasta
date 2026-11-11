@@ -89,22 +89,28 @@ class _PriceHistoryScreenState extends State<PriceHistoryScreen> {
                               ],
                             ),
                           ),
-                          PriceGradientText(
-                            cheapest != null ? '₹${cheapest.price}' : '—',
-                            size: 36,
+                          const SizedBox(width: 10),
+                          Flexible(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerRight,
+                              child: PriceGradientText(
+                                cheapest != null ? '₹${cheapest.price}' : '—',
+                                size: 36,
+                              ),
+                            ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 18),
-                      Row(
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
                         children: _ranges.map((r) {
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: SastaChip(
-                              label: r,
-                              selected: _range == r,
-                              onTap: () => setState(() => _range = r),
-                            ),
+                          return SastaChip(
+                            label: r,
+                            selected: _range == r,
+                            onTap: () => setState(() => _range = r),
                           );
                         }).toList(),
                       ),

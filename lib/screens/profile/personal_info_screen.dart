@@ -122,12 +122,16 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                   child: Column(
                     children: [
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            'Member since',
-                            style: SastaText.muted(context, size: 13),
+                          Expanded(
+                            child: Text(
+                              'Member since',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: SastaText.muted(context, size: 13),
+                            ),
                           ),
+                          const SizedBox(width: 8),
                           Text(
                             'Nov 2026',
                             style: SastaText.body(
@@ -140,12 +144,16 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                       ),
                       const SizedBox(height: 8),
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            'Account status',
-                            style: SastaText.muted(context, size: 13),
+                          Expanded(
+                            child: Text(
+                              'Account status',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: SastaText.muted(context, size: 13),
+                            ),
                           ),
+                          const SizedBox(width: 8),
                           SastaTag(
                             label: 'Active',
                             backgroundColor: palette.mint,

@@ -102,17 +102,19 @@ class _LocationsScreenState extends State<LocationsScreen> {
                   ),
                   const SizedBox(height: 12),
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        'Set as default delivery address',
-                        style: SastaText.body(
-                          ctx,
-                          size: 14,
-                          weight: FontWeight.w600,
-                          color: palette.ink,
+                      Expanded(
+                        child: Text(
+                          'Set as default delivery address',
+                          style: SastaText.body(
+                            ctx,
+                            size: 14,
+                            weight: FontWeight.w600,
+                            color: palette.ink,
+                          ),
                         ),
                       ),
+                      const SizedBox(width: 12),
                       SastaSwitch(
                         value: makeDefault,
                         onChanged: (v) => setModalState(() => makeDefault = v),
@@ -270,12 +272,16 @@ class _LocationsScreenState extends State<LocationsScreen> {
                                   children: [
                                     Row(
                                       children: [
-                                        Text(
-                                          loc.label,
-                                          style: SastaText.body(
-                                            context,
-                                            size: 15,
-                                            weight: FontWeight.w700,
+                                        Flexible(
+                                          child: Text(
+                                            loc.label,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: SastaText.body(
+                                              context,
+                                              size: 15,
+                                              weight: FontWeight.w700,
+                                            ),
                                           ),
                                         ),
                                         if (loc.isDefault) ...[
@@ -290,12 +296,20 @@ class _LocationsScreenState extends State<LocationsScreen> {
                                     ),
                                     Text(
                                       '${loc.pincode} · ${loc.area}',
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
                                       style: SastaText.muted(context, size: 12),
                                     ),
                                   ],
                                 ),
                               ),
                               IconButton(
+                                visualDensity: VisualDensity.compact,
+                                padding: const EdgeInsets.all(6),
+                                constraints: const BoxConstraints(
+                                  minWidth: 36,
+                                  minHeight: 36,
+                                ),
                                 onPressed: () => _openAddLocationSheet(
                                   context,
                                   existing: loc,
@@ -308,6 +322,12 @@ class _LocationsScreenState extends State<LocationsScreen> {
                               ),
                               if (state.locations.length > 1)
                                 IconButton(
+                                  visualDensity: VisualDensity.compact,
+                                  padding: const EdgeInsets.all(6),
+                                  constraints: const BoxConstraints(
+                                    minWidth: 36,
+                                    minHeight: 36,
+                                  ),
                                   onPressed: () => state.deleteLocation(loc.id),
                                   icon: Icon(
                                     Icons.delete_outline_rounded,

@@ -53,21 +53,30 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 SastaHeaderBar(
                   title: 'Alerts',
                   trailing: TextButton(
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      minimumSize: const Size(44, 40),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
                     onPressed: state.unreadNotificationCount == 0
                         ? null
                         : () {
                             state.markAllNotificationsRead();
                             showSastaToast(context, 'All alerts marked read');
                           },
-                    child: Text(
-                      'Mark all read',
-                      style: SastaText.body(
-                        context,
-                        size: 13,
-                        weight: FontWeight.w700,
-                        color: state.unreadNotificationCount == 0
-                            ? palette.muted
-                            : palette.linkText,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        'Mark all read',
+                        maxLines: 1,
+                        style: SastaText.body(
+                          context,
+                          size: 13,
+                          weight: FontWeight.w700,
+                          color: state.unreadNotificationCount == 0
+                              ? palette.muted
+                              : palette.linkText,
+                        ),
                       ),
                     ),
                   ),
