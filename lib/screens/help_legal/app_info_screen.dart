@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/sasta_routes.dart';
+import '../../data/sasta_app_state.dart';
 import '../../theme/sasta_theme.dart';
 import '../../theme/sasta_tokens.dart';
 import '../../widgets/sasta_background.dart';
@@ -48,7 +49,7 @@ class _AppInfoScreenState extends State<AppInfoScreen> {
               Text(
                 '• Flutter SDK & Material Icons\n'
                 '• Bricolage Grotesque & DM Sans via Google Fonts\n'
-                '• Retailer names (Blinkit, Zepto, Swiggy Instamart, Flipkart Minutes) belong to their respective owners and are shown with sample comparison prices.',
+                '• Retailer names (Blinkit, Zepto, Swiggy Instamart, Flipkart Minutes) belong to their respective owners and are shown with local comparison estimates.',
                 style: SastaText.muted(ctx, size: 13),
               ),
               const SizedBox(height: 18),
@@ -163,10 +164,19 @@ class _AppInfoScreenState extends State<AppInfoScreen> {
                         icon: Icons.ios_share_rounded,
                         badgeBackground: palette.mint,
                         badgeForeground: palette.successText,
-                        onTap: () => showSastaToast(
-                          context,
-                          'Invite link ready: sasta.example/download',
-                        ),
+                        onTap: () async {
+                          final shared = await SastaScope.read(context)
+                              .shareService
+                              .shareText(
+                                'Compare Blinkit, Zepto, Swiggy Instamart & Flipkart Minutes prices in one place with Sasta — https://sastaapp.in',
+                                subject: 'Sasta — Grocery Price Comparison',
+                              );
+                          if (!context.mounted || shared) return;
+                          showSastaToast(
+                            context,
+                            'Copied invite link: https://sastaapp.in',
+                          );
+                        },
                       ),
                     ],
                   ),

@@ -59,11 +59,13 @@ class NotificationSettingsScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 18),
-                Opacity(
-                  opacity: state.pushNotificationsAll ? 1.0 : 0.45,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
+                AbsorbPointer(
+                  absorbing: !state.pushNotificationsAll,
+                  child: Opacity(
+                    opacity: state.pushNotificationsAll ? 1.0 : 0.45,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
                       Text('PRICE', style: SastaText.eyebrow(context)),
                       _NotifRow(
                         title: 'Price drops on saved items',
@@ -115,6 +117,7 @@ class NotificationSettingsScreen extends StatelessWidget {
                       ),
                     ],
                   ),
+                ),
                 ),
                 const SizedBox(height: 22),
                 SastaPrimaryButton(

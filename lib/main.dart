@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 
 import 'app/sasta_router.dart';
 import 'data/sasta_app_state.dart';
+import 'services/quick_commerce_api.dart';
 import 'theme/sasta_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final loadedState = await SastaAppState.createAndLoad();
+  final loadedState = await SastaAppState.createAndLoad(
+    defaultApiConfig: QuickCommerceApiConfig.fromEnvironment(),
+  );
   runApp(SastaApp(stateOverride: loadedState));
 }
 

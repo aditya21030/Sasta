@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../data/sasta_app_state.dart';
 import '../../theme/sasta_theme.dart';
 import '../../theme/sasta_tokens.dart';
 import '../../widgets/sasta_background.dart';
@@ -37,6 +38,12 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
 
   void _submit() {
     FocusScope.of(context).unfocus();
+    final details = _notesCtrl.text.trim();
+    SastaScope.read(context).submitSupportTicket(
+      topic: 'Feedback · $_type',
+      subject: '$_rating-star rating ($_moodLabel)',
+      message: details.isEmpty ? '$_rating/5 stars — $_type' : details,
+    );
     showSastaToast(context, 'Thanks for your $_rating-star feedback!');
     Navigator.of(context).maybePop();
   }

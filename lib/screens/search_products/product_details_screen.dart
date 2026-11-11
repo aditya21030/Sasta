@@ -29,8 +29,12 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
       final pId = widget.args?.productId;
       if (pId != null) {
         final state = SastaScope.read(context);
-        state.addToRecentlyViewed(pId);
-        if (state.isApiConfigured) {
+        if (state.productById(pId) != null) {
+          state.addToRecentlyViewed(pId);
+        }
+        if (state.isApiConfigured &&
+            !state.onDemandLiveMode &&
+            !state.isLiveQuotaExhausted) {
           state.refreshProductDetails(pId);
         }
       }
@@ -43,9 +47,10 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     final palette = context.sasta;
     final product = state.productById(widget.args?.productId ?? 'amul_milk') ??
         state.products.first;
-    final vIdx = _selectedVariantIndex ??
+    final rawVariant = _selectedVariantIndex ??
         widget.args?.variantIndex ??
         product.defaultVariantIndex;
+    final vIdx = rawVariant.clamp(0, product.variants.length - 1);
     final variant = product.variantAt(vIdx);
     final cheapest = product.cheapestQuote(
       vIdx,
@@ -56,7 +61,10 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
       enabledRetailers: state.enabledRetailers,
     );
     final isFav = state.isFavourite(product.id);
-    final qtyInBasket = state.quantityInActiveBasket(product.id);
+    final qtyInBasket = state.quantityInActiveBasket(
+      product.id,
+      variantIndex: vIdx,
+    );
 
     return Scaffold(
       body: SastaBackground(
@@ -110,18 +118,33 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                                 Container(
                                   width: 152,
                                   height: 152,
+                                  clipBehavior: Clip.antiAlias,
                                   decoration: BoxDecoration(
                                     color: palette.isDark
                                         ? palette.surface
                                         : Colors.white,
                                     shape: BoxShape.circle,
                                   ),
-                                ),
-                                CustomPaint(
-                                  size: const Size.square(102),
-                                  painter: ProductArtPainter(
-                                    kind: product.artKind,
-                                  ),
+                                  padding: const EdgeInsets.all(14),
+                                  alignment: Alignment.center,
+                                  child: product.bestImageUrl != null
+                                      ? Image.network(
+                                          product.bestImageUrl!,
+                                          fit: BoxFit.contain,
+                                          errorBuilder: (_, _, _) =>
+                                              CustomPaint(
+                                            size: const Size.square(102),
+                                            painter: ProductArtPainter(
+                                              kind: product.artKind,
+                                            ),
+                                          ),
+                                        )
+                                      : CustomPaint(
+                                          size: const Size.square(102),
+                                          painter: ProductArtPainter(
+                                            kind: product.artKind,
+                                          ),
+                                        ),
                                 ),
                                 const Positioned(
                                   right: 18,
@@ -175,6 +198,31 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                                   product.subtitle,
                                   style: SastaText.muted(context, size: 14),
                                 ),
+                                if (product.rating != null) ...[
+                                  const SizedBox(height: 6),
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(
+                                        Icons.star_rounded,
+                                        size: 15,
+                                        color: SastaColors.sparkleOrange,
+                                      ),
+                                      const SizedBox(width: 3),
+                                      Text(
+                                        product.ratingCount != null
+                                            ? '${product.rating!.toStringAsFixed(1)} (${product.ratingCount})'
+                                            : product.rating!
+                                                .toStringAsFixed(1),
+                                        style: SastaText.muted(
+                                          context,
+                                          size: 12,
+                                          weight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
                               ],
                             ),
                           ),
@@ -242,7 +290,9 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                               const SizedBox(width: 12),
                               Expanded(
                                 child: Text(
-                                  'Cheapest on ${cheapest.retailer.shortName} · +${(appCount - 1).clamp(0, 3)} more apps to compare',
+                                  appCount > 1
+                                      ? 'Cheapest on ${cheapest.retailer.shortName} · +${appCount - 1} more ${appCount - 1 == 1 ? 'app' : 'apps'} to compare'
+                                      : 'Available on ${cheapest.retailer.shortName} · Tap to compare',
                                   style: SastaText.body(
                                     context,
                                     size: 13,

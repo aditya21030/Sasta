@@ -34,14 +34,42 @@ class _SastaMascotState extends State<SastaMascot>
   AnimationController? _blinkController;
 
   @override
-  void initState() {
-    super.initState();
-    if (widget.animateBlink && widget.expression == MascotExpression.happy) {
-      _blinkController = AnimationController(
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncBlinkController();
+  }
+
+  @override
+  void didUpdateWidget(covariant SastaMascot oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.animateBlink != widget.animateBlink ||
+        oldWidget.expression != widget.expression) {
+      _syncBlinkController();
+    }
+  }
+
+  void _syncBlinkController() {
+    final disableAnimations =
+        MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    final shouldBlink = !disableAnimations &&
+        widget.animateBlink &&
+        widget.expression == MascotExpression.happy;
+    if (shouldBlink) {
+      _blinkController ??= AnimationController(
         vsync: this,
         duration: const Duration(milliseconds: 4500),
-      )..repeat();
+      );
+      if (!_blinkController!.isAnimating) {
+        _blinkController!.repeat();
+      }
+    } else {
+      _blinkController?.stop();
     }
+  }
+
+  @override
+  void initState() {
+    super.initState();
   }
 
   @override

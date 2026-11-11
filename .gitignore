@@ -43,3 +43,7 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Local backend cache persistence
+backend/.sasta-cache.json
+*.sasta-cache.json

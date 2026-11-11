@@ -50,12 +50,14 @@ class SearchResultsArgs {
     this.categoryId,
     this.titleOverride,
     this.dealsOnly = false,
+    this.trendingOnly = false,
   });
 
   final String query;
   final String? categoryId;
   final String? titleOverride;
   final bool dealsOnly;
+  final bool trendingOnly;
 }
 
 class ProductRouteArgs {
@@ -70,17 +72,21 @@ class ProductRouteArgs {
 
 class BasketCompareArgs {
   const BasketCompareArgs({
-    this.initialTab = 0, // 0: Single store, 1: Split basket, 2: Savings
+    this.initialTab, // 0: Single store, 1: Split basket, 2: Savings
     this.customEntries,
   });
 
-  final int initialTab;
+  final int? initialTab;
   final List<BasketEntry>? customEntries;
 }
 
 class CheckoutArgs {
-  const CheckoutArgs({required this.planType});
+  const CheckoutArgs({
+    required this.planType,
+    this.paymentMethod = 'UPI',
+  });
   final SastaPlanType planType;
+  final String paymentMethod;
 }
 
 abstract final class SastaNav {
@@ -104,6 +110,7 @@ abstract final class SastaNav {
     String? categoryId,
     String? titleOverride,
     bool dealsOnly = false,
+    bool trendingOnly = false,
   }) =>
       push(
         context,
@@ -113,6 +120,7 @@ abstract final class SastaNav {
           categoryId: categoryId,
           titleOverride: titleOverride,
           dealsOnly: dealsOnly,
+          trendingOnly: trendingOnly,
         ),
       );
 
@@ -160,7 +168,7 @@ abstract final class SastaNav {
 
   static Future<void> openBasketCompare(
     BuildContext context, {
-    int initialTab = 0,
+    int? initialTab,
     List<BasketEntry>? customEntries,
   }) =>
       push(

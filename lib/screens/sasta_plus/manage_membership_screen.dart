@@ -9,6 +9,7 @@ import '../../widgets/sasta_background.dart';
 import '../../widgets/sasta_components.dart';
 import '../../widgets/sasta_mascot.dart';
 import '../../widgets/sasta_motion.dart';
+import '../../widgets/sasta_sheets.dart';
 
 class ManageMembershipScreen extends StatelessWidget {
   const ManageMembershipScreen({super.key});
@@ -49,12 +50,68 @@ class ManageMembershipScreen extends StatelessWidget {
     }
   }
 
+  void _showBenefitsSheet(BuildContext context) {
+    showSastaSheet(
+      context: context,
+      builder: (ctx) {
+        final palette = ctx.sasta;
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(22, 12, 22, 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: palette.divider,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                'Sasta+ benefits',
+                style: SastaText.display(ctx, size: 24),
+              ),
+              const SizedBox(height: 10),
+              SastaCard(
+                color: palette.lavender,
+                shadow: false,
+                child: const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _DetailLine(label: 'Price history', value: '90 days'),
+                    SizedBox(height: 10),
+                    _DetailLine(label: 'Price alerts', value: 'Unlimited'),
+                    SizedBox(height: 10),
+                    _DetailLine(label: 'Live searches', value: 'Unlimited'),
+                    SizedBox(height: 10),
+                    _DetailLine(label: 'Basket splits', value: 'All stores'),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              SastaPrimaryButton(
+                label: 'Done',
+                onPressed: () => Navigator.of(ctx).pop(),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = SastaScope.of(context);
     final palette = context.sasta;
     final isActive = state.isPlusActive;
     final isYearly = state.planType == SastaPlanType.yearly;
+    final latestInvoice = state.invoices.firstOrNull;
     final planSubtitle = switch (state.planType) {
       SastaPlanType.free => 'Free plan',
       SastaPlanType.monthly => 'Monthly plan',
@@ -165,7 +222,11 @@ class ManageMembershipScreen extends StatelessWidget {
                       const SizedBox(height: 10),
                       _DetailLine(
                         label: 'Payment',
-                        value: isActive ? 'Paid' : 'No charge',
+                        value: isActive
+                            ? (latestInvoice != null
+                                ? 'Paid · ${latestInvoice.txnCode}'
+                                : 'Paid')
+                            : 'No charge',
                       ),
                     ],
                   ),
@@ -248,10 +309,7 @@ class ManageMembershipScreen extends StatelessWidget {
                         icon: Icons.auto_awesome_outlined,
                         badgeBackground: palette.lavender,
                         badgeForeground: palette.lavenderText,
-                        onTap: () => SastaNav.push(
-                          context,
-                          SastaRouteNames.plusLanding,
-                        ),
+                        onTap: () => _showBenefitsSheet(context),
                       ),
                       Divider(height: 1, color: palette.divider),
                       SastaListRow(
@@ -273,8 +331,8 @@ class ManageMembershipScreen extends StatelessWidget {
                   shadow: false,
                   child: Text(
                     isActive
-                        ? 'If you cancel, Sasta+ stays active until $renewalText in your current billing cycle.'
-                        : 'Upgrade anytime to unlock 90-day price history and unlimited basket splits.',
+                        ? 'Turn off auto-renew to avoid future charges while keeping Sasta+ until $renewalText, or cancel anytime to return to the Free plan immediately.'
+                        : 'Upgrade anytime to unlock 90-day price history and unlimited live price checks.',
                     style: SastaText.body(
                       context,
                       size: 13,

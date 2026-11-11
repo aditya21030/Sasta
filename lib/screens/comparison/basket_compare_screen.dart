@@ -33,11 +33,16 @@ class _BasketCompareScreenState extends State<BasketCompareScreen> {
   Widget build(BuildContext context) {
     final state = SastaScope.of(context);
     final palette = context.sasta;
+    final activeEntries =
+        widget.args?.customEntries ?? state.activeBasket.entries;
     final comp = state.computeBasketComparison(
       customEntries: widget.args?.customEntries,
     );
+    final hasComparableItems =
+        comp.storeTotals.any((s) => s.availableCount > 0) ||
+            comp.splitSlices.isNotEmpty;
     final cheapest = comp.cheapestCompleteStore;
-    final basketQuery = state.activeBasket.entries
+    final basketQuery = activeEntries
         .map((e) => state.productById(e.productId)?.name)
         .whereType<String>()
         .take(2)
@@ -99,14 +104,16 @@ class _BasketCompareScreenState extends State<BasketCompareScreen> {
                     SastaSpace.page,
                     20,
                   ),
-                  child: switch (_tabIndex) {
-                    0 => _SingleStoreBody(
-                        comparison: comp,
-                        searchQuery: basketQuery,
-                      ),
-                    1 => _SplitBasketBody(comparison: comp),
-                    _ => _SavingsBody(comparison: comp),
-                  },
+                  child: !hasComparableItems
+                      ? const _EmptyCompareState()
+                      : switch (_tabIndex) {
+                          0 => _SingleStoreBody(
+                              comparison: comp,
+                              searchQuery: basketQuery,
+                            ),
+                          1 => _SplitBasketBody(comparison: comp),
+                          _ => _SavingsBody(comparison: comp),
+                        },
                 ),
               ),
               Padding(
@@ -219,6 +226,7 @@ class _SingleStoreBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final state = SastaScope.read(context);
     final palette = context.sasta;
     final winner = comparison.cheapestCompleteStore;
 
@@ -319,8 +327,8 @@ class _SingleStoreBody extends StatelessWidget {
                           ),
                           Text(
                             store.isComplete
-                                ? 'All ${store.totalProducts} available · ${store.retailer.eta}'
-                                : '${store.missingProductNames.first} unavailable · ${store.availableCount} of ${store.totalProducts}',
+                                ? 'All ${store.totalProducts} available · ${state.etaFor(store.retailer)}'
+                                : '${store.missingProductNames.isEmpty ? 'Some items' : store.missingProductNames.length > 1 ? '${store.missingProductNames.first} +${store.missingProductNames.length - 1}' : store.missingProductNames.first} unavailable · ${store.availableCount} of ${store.totalProducts}',
                             style: SastaText.muted(context, size: 12),
                           ),
                         ],
@@ -370,16 +378,20 @@ class _SplitBasketBody extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        splitWorthIt
-                            ? 'Mix apps to save ₹$splitSavings'
-                            : 'Better in 1 store',
+                        comparison.splitSlices.isEmpty
+                            ? 'No split combinations'
+                            : splitWorthIt
+                                ? 'Mix apps to save ₹$splitSavings'
+                                : 'Better in 1 store',
                         style: SastaText.display(context, size: 20),
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        splitWorthIt
-                            ? 'Ordering across ${comparison.splitSlices.length} apps saves ₹$splitSavings on item prices.'
-                            : 'Mixing apps saves ₹$splitSavings on items, which may get used up by a second delivery fee.',
+                        comparison.splitSlices.isEmpty
+                            ? 'Enable more delivery apps or add available items to compare split savings.'
+                            : splitWorthIt
+                                ? 'Ordering across ${comparison.splitSlices.length} apps saves ₹$splitSavings on item prices.'
+                                : 'Mixing apps saves ₹$splitSavings on items, which may get used up by a second delivery fee.',
                         style: SastaText.body(
                           context,
                           size: 13,
@@ -390,10 +402,14 @@ class _SplitBasketBody extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 10),
-                const SastaMascot(
+                SastaMascot(
                   size: 72,
-                  color: SastaColors.instamart,
-                  expression: MascotExpression.happy,
+                  color: comparison.splitSlices.isEmpty
+                      ? SastaColors.mutedGrey
+                      : SastaColors.instamart,
+                  expression: comparison.splitSlices.isEmpty
+                      ? MascotExpression.calm
+                      : MascotExpression.happy,
                 ),
               ],
             ),
@@ -404,6 +420,16 @@ class _SplitBasketBody extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: SastaCard(
+              onTap: () {
+                final query =
+                    slice.lines.map((l) => l.product.name).take(2).join(' ');
+                showRetailerHandoffSheet(
+                  context,
+                  retailer: slice.retailer,
+                  estimatedAmount: slice.subtotal,
+                  searchQuery: query.trim().isEmpty ? null : query,
+                );
+              },
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -589,7 +615,7 @@ class _SavingsBody extends StatelessWidget {
                     child: _CompareBar(
                       label: 'Costliest',
                       amount: '₹$priciest',
-                      ratio: 1.0,
+                      ratio: priciest > 0 ? priciest / maxBar : 0.0,
                       color: SastaColors.mutedGrey,
                     ),
                   ),
@@ -665,7 +691,7 @@ class _CompareBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final safeRatio = ratio.clamp(0.35, 1.0);
+    final barHeight = ratio <= 0 ? 8.0 : 100 * ratio.clamp(0.28, 1.0);
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -678,7 +704,7 @@ class _CompareBar extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         Container(
-          height: 100 * safeRatio,
+          height: barHeight,
           width: double.infinity,
           decoration: BoxDecoration(
             color: color,
@@ -691,6 +717,40 @@ class _CompareBar extends StatelessWidget {
           child: Text(label, style: SastaText.muted(context, size: 12)),
         ),
       ],
+    );
+  }
+}
+
+class _EmptyCompareState extends StatelessWidget {
+  const _EmptyCompareState();
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.sasta;
+    return SastaCard(
+      color: palette.field,
+      shadow: false,
+      child: Column(
+        children: [
+          const SastaMascot(
+            size: 72,
+            color: SastaColors.mutedGrey,
+            expression: MascotExpression.calm,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'No comparable in-stock items',
+            textAlign: TextAlign.center,
+            style: SastaText.display(context, size: 20),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Add available items to your basket or enable more delivery apps in Settings to compare totals.',
+            textAlign: TextAlign.center,
+            style: SastaText.muted(context, size: 13),
+          ),
+        ],
+      ),
     );
   }
 }

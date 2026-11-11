@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../theme/sasta_theme.dart';
@@ -173,7 +174,8 @@ class _AnimatedPriceLineChartState extends State<AnimatedPriceLineChart>
   @override
   void didUpdateWidget(covariant AnimatedPriceLineChart oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.primaryPoints != widget.primaryPoints) {
+    if (!listEquals(oldWidget.primaryPoints, widget.primaryPoints) ||
+        !listEquals(oldWidget.secondaryPoints, widget.secondaryPoints)) {
       _selectedIndex = null;
       _drawController
         ..reset()

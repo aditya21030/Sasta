@@ -78,8 +78,11 @@ class FavouritesScreen extends StatelessWidget {
                           const SizedBox(height: 18),
                           SastaPrimaryButton(
                             label: 'Explore deals',
-                            onPressed: () =>
-                                SastaNav.openSearchResults(context),
+                            onPressed: () => SastaNav.openSearchResults(
+                              context,
+                              titleOverride: 'Best deals',
+                              dealsOnly: true,
+                            ),
                           ),
                         ],
                       ),
@@ -99,11 +102,11 @@ class FavouritesScreen extends StatelessWidget {
                       crossAxisCount: 2,
                       mainAxisSpacing: 12,
                       crossAxisSpacing: 12,
-                      mainAxisExtent: 192 +
-                          34 *
+                      mainAxisExtent: 186 +
+                          52 *
                               MediaQuery.textScalerOf(context)
                                   .scale(1.0)
-                                  .clamp(1.0, 2.0),
+                                  .clamp(1.0, 2.8),
                     ),
                     itemCount: favourites.length,
                     itemBuilder: (context, i) {

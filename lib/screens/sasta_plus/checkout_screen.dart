@@ -171,7 +171,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Text(
-                                    'I agree to the Sasta+ subscription terms and sample billing schedule.',
+                                    'I agree to the Sasta+ subscription terms and billing schedule.',
                                     style: SastaText.muted(context, size: 13),
                                   ),
                                 ),
@@ -188,10 +188,25 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   label: 'Confirm & pay ₹$amount',
                   onPressed: _acceptedTerms
                       ? () {
-                          state.subscribeToPlan(widget.planType);
+                          final paymentLabel = switch (_paymentMethod) {
+                            'card' => 'Card',
+                            'netbanking' => 'Net banking',
+                            _ => 'UPI',
+                          };
+                          final effectivePlan =
+                              widget.planType == SastaPlanType.free
+                                  ? SastaPlanType.monthly
+                                  : widget.planType;
+                          state.subscribeToPlan(
+                            effectivePlan,
+                            paymentMethod: paymentLabel,
+                          );
                           Navigator.of(context).pushReplacementNamed(
                             SastaRouteNames.plusSuccess,
-                            arguments: CheckoutArgs(planType: widget.planType),
+                            arguments: CheckoutArgs(
+                              planType: effectivePlan,
+                              paymentMethod: paymentLabel,
+                            ),
                           );
                         }
                       : null,

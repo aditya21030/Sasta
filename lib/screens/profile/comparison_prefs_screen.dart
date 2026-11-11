@@ -234,7 +234,17 @@ class _ComparisonPrefsScreenState extends State<ComparisonPrefsScreen> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 22),
+                const SizedBox(height: 18),
+                Text('CREDIT SAVER', style: SastaText.eyebrow(context)),
+                const SizedBox(height: 6),
+                _PrefToggleRow(
+                  title: 'Save credits (Manual live fetch)',
+                  subtitle:
+                      'Browse cached prices free · fetch live only when you search or tap',
+                  value: state.onDemandLiveMode,
+                  onChanged: state.setOnDemandLiveMode,
+                ),
+                const SizedBox(height: 16),
                 SastaCard(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 14,
@@ -256,7 +266,9 @@ class _ComparisonPrefsScreenState extends State<ComparisonPrefsScreen> {
                             : palette.muted,
                       ),
                       title: Text(
-                        'Live price server (Optional)',
+                        state.isQuickCommerceDirect
+                            ? 'Live price server (QuickCommerceAPI)'
+                            : 'Live price server (Optional)',
                         style: SastaText.body(
                           context,
                           size: 14,
@@ -265,11 +277,54 @@ class _ComparisonPrefsScreenState extends State<ComparisonPrefsScreen> {
                       ),
                       subtitle: Text(
                         state.isLiveCatalogActive
-                            ? 'Connected · custom price feed active'
-                            : 'Built-in price catalog active · tap to link API',
+                            ? (state.apiCreditsRemaining != null
+                                ? 'Connected · ${state.apiCreditsRemaining} credits left'
+                                : 'Connected · live price feed active')
+                            : state.isApiConfigured
+                                ? 'API key configured · tap Sync to fetch live prices'
+                                : 'Built-in price catalog active · tap to link API',
                         style: SastaText.muted(context, size: 12),
                       ),
                       children: [
+                        if (state.isApiConfigured) ...[
+                          const SizedBox(height: 4),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              state.hasUnlimitedLiveSearches
+                                  ? 'Est. ${state.estimatedCreditsPerSearch} credit${state.estimatedCreditsPerSearch == 1 ? '' : 's'}/uncached search · Unlimited refreshes'
+                                  : 'Est. ${state.estimatedCreditsPerSearch} credit${state.estimatedCreditsPerSearch == 1 ? '' : 's'}/uncached search · ${state.remainingFreeLiveSearches ?? 0}/${SastaAppState.freeDailyLiveSearchLimit} free live left today',
+                              style: SastaText.muted(context, size: 12),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  state.apiCreditsRemaining != null
+                                      ? 'Credits remaining: ${state.apiCreditsRemaining}'
+                                      : 'Credit balance: tap check (0 credits)',
+                                  style: SastaText.muted(context, size: 12),
+                                ),
+                              ),
+                              TextButton(
+                                onPressed: () async {
+                                  final info =
+                                      await state.refreshCreditsBalance();
+                                  if (!context.mounted) return;
+                                  showSastaToast(
+                                    context,
+                                    info != null
+                                        ? '${info.totalAvailable} credits available (${info.totalUsed} used)'
+                                        : 'Unable to fetch credits right now',
+                                  );
+                                },
+                                child: const Text('Check balance'),
+                              ),
+                            ],
+                          ),
+                        ],
                         if (state.lastSyncError != null) ...[
                           const SizedBox(height: 6),
                           Align(

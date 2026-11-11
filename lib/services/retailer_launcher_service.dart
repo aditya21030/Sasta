@@ -55,7 +55,13 @@ class RetailerLauncherService {
                 queryParameters: {'query': trimmed},
               );
       case RetailerId.flipkartMinutes:
-        return Uri.parse(retailer.schemeUrl);
+        return trimmed.isEmpty
+            ? Uri.parse(retailer.schemeUrl)
+            : Uri(
+                scheme: 'flipkart',
+                host: 'minutes',
+                queryParameters: {'q': trimmed},
+              );
     }
   }
 
@@ -88,15 +94,36 @@ class RetailerLauncherService {
     }
   }
 
-  /// Launches the installed retailer app via URI scheme, falling back to its web store URL.
+  /// Launches the installed retailer app via URI scheme, or direct product URL,
+  /// falling back to its web store URL.
   Future<RetailerLaunchOutcome> openRetailer(
     RetailerId retailer, {
     String? query,
+    String? productUrl,
   }) async {
+    final trimmedProductUrl = productUrl?.trim() ?? '';
+    final directUri = trimmedProductUrl.isNotEmpty
+        ? Uri.tryParse(trimmedProductUrl)
+        : null;
     final nativeUri = buildNativeUri(retailer, query: query);
     final webUri = buildWebUri(retailer, query: query);
 
     try {
+      if (directUri != null &&
+          (directUri.scheme == 'https' || directUri.scheme == 'http')) {
+        final okDirect = await _launch(
+          directUri,
+          mode: launcher.LaunchMode.externalApplication,
+        );
+        if (okDirect) {
+          return RetailerLaunchOutcome(
+            launched: true,
+            openedNativeApp: true,
+            targetUri: directUri,
+          );
+        }
+      }
+
       final canNative = await _canLaunch(nativeUri);
       if (canNative) {
         final ok = await _launch(
@@ -111,14 +138,15 @@ class RetailerLauncherService {
           );
         }
       }
+      final fallbackWeb = webUri;
       final okWeb = await _launch(
-        webUri,
+        fallbackWeb,
         mode: launcher.LaunchMode.externalApplication,
       );
       return RetailerLaunchOutcome(
         launched: okWeb,
         openedNativeApp: false,
-        targetUri: webUri,
+        targetUri: fallbackWeb,
       );
     } on MissingPluginException {
       return RetailerLaunchOutcome(

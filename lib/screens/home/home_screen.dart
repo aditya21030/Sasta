@@ -23,7 +23,23 @@ class HomeScreen extends StatelessWidget {
 
     return RefreshIndicator(
       onRefresh: () async {
-        await state.syncCatalogForLocation();
+        if (!state.isApiConfigured) {
+          showSastaToast(
+            context,
+            'Connect a live price server in Comparison settings to refresh live prices',
+          );
+          return;
+        }
+        final ok = await state.syncCatalogForLocation(forceRefresh: true);
+        if (!context.mounted) return;
+        if (!ok && state.lastSyncError != null) {
+          showSastaToast(context, state.lastSyncError!);
+        } else if (ok) {
+          showSastaToast(
+            context,
+            'Prices refreshed for ${state.activeLocation.pincode}',
+          );
+        }
       },
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(
@@ -285,9 +301,10 @@ class HomeScreen extends StatelessWidget {
               const SizedBox(height: 22),
               _ExploreBrandsSection(state: state),
               const SizedBox(height: 22),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: SastaSpace.page),
-                child: _HomeSavingsCard(),
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: SastaSpace.page),
+                child: _HomeSavingsCard(state: state),
               ),
               const SizedBox(height: 22),
               Padding(
@@ -296,9 +313,10 @@ class HomeScreen extends StatelessWidget {
                 child: _HomePriceAlertsCard(state: state),
               ),
               const SizedBox(height: 22),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: SastaSpace.page),
-                child: _MonthlySavingsCard(),
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: SastaSpace.page),
+                child: _MonthlySavingsCard(state: state),
               ),
               const SizedBox(height: 22),
               Padding(
@@ -382,9 +400,23 @@ class _HomeOfflineSection extends StatelessWidget {
         const SizedBox(height: 20),
         SastaPrimaryButton(
           label: 'Try again',
-          onPressed: () {
+          onPressed: () async {
             state.setHomeOfflineError(false);
-            showSastaToast(context, 'Back online · prices refreshed');
+            if (state.isApiConfigured) {
+              final ok = await state.syncCatalogForLocation(forceRefresh: true);
+              if (!context.mounted) return;
+              if (!ok) {
+                state.setHomeOfflineError(true);
+                showSastaToast(
+                  context,
+                  state.lastSyncError ?? 'Still offline · please check your connection',
+                );
+                return;
+              }
+            }
+            if (context.mounted) {
+              showSastaToast(context, 'Back online · prices refreshed');
+            }
           },
         ),
         const SizedBox(height: 24),
@@ -572,6 +604,7 @@ class _BestDealsSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final deals = state.products.where((p) => p.isDeal).toList();
+    if (deals.isEmpty) return const SizedBox.shrink();
     return Column(
       children: [
         Padding(
@@ -636,6 +669,7 @@ class _TrendingSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = state.products.where((p) => p.isTrending).toList();
+    if (items.isEmpty) return const SizedBox.shrink();
     return Column(
       children: [
         Padding(
@@ -646,6 +680,7 @@ class _TrendingSection extends StatelessWidget {
             onAction: () => SastaNav.openSearchResults(
               context,
               titleOverride: 'Trending now',
+              trendingOnly: true,
             ),
           ),
         ),
@@ -690,6 +725,7 @@ class _PricesDroppedSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.sasta;
     final drops = state.products.where((p) => p.isPriceDrop).toList();
+    if (drops.isEmpty) return const SizedBox.shrink();
     return Column(
       children: [
         Padding(
@@ -719,7 +755,10 @@ class _PricesDroppedSection extends StatelessWidget {
                   Builder(
                     builder: (context) {
                       final p = drops[i];
-                      final cheapest = p.cheapestQuote(p.defaultVariantIndex);
+                      final cheapest = p.cheapestQuote(
+                        p.defaultVariantIndex,
+                        enabledRetailers: state.enabledRetailers,
+                      );
                       return SastaCard(
                         color: palette.surface,
                         onTap: () => SastaNav.openPriceHistory(context, p.id),
@@ -737,6 +776,7 @@ class _PricesDroppedSection extends StatelessWidget {
                                       ProductArtTile(
                                         kind: p.artKind,
                                         pastel: p.pastel,
+                                        imageUrl: p.bestImageUrl,
                                         size: 52,
                                       ),
                                       const SizedBox(width: 10),
@@ -944,26 +984,61 @@ class _SmartPicksSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.sasta;
-    final picks = [
+    final rawCandidates = [
       (
         id: 'pick_dahi',
-        title: 'Switch to Amul Dahi 400 g',
-        subtitle: 'Save ₹6 compared to your recent curd check',
-        tag: 'Save ₹6 · Blinkit',
-        pastel: SastaPastel.mint,
         productId: 'amul_dahi',
         variantIdx: 0,
+        pastel: SastaPastel.mint,
       ),
       (
         id: 'pick_milk1l',
-        title: 'Try 1 L Taaza Milk pack',
-        subtitle: 'Lower unit price at ₹5.2 / 100 ml on Zepto',
-        tag: 'Save ₹8 · Zepto',
-        pastel: SastaPastel.lavender,
         productId: 'amul_milk',
         variantIdx: 2,
+        pastel: SastaPastel.lavender,
       ),
-    ].where((p) => !state.dismissedPickIds.contains(p.id)).toList();
+    ];
+    final picks = rawCandidates
+        .where((c) => !state.dismissedPickIds.contains(c.id))
+        .map((c) {
+          final product = state.productById(c.productId);
+          if (product == null) return null;
+          final vIdx = c.variantIdx.clamp(0, product.variants.length - 1);
+          final variant = product.variantAt(vIdx);
+          final quotes = product.sortedQuotes(
+            vIdx,
+            enabledRetailers: state.enabledRetailers,
+          ).where((q) => q.isAvailable).toList();
+          if (quotes.isEmpty) return null;
+          final cheapest = quotes.first;
+          final highest = quotes.last;
+          final saving = (highest.price ?? 0) - (cheapest.price ?? 0);
+          final tag = saving > 0
+              ? 'Save ₹$saving · ${cheapest.retailer.shortName}'
+              : '₹${cheapest.price} · ${cheapest.retailer.shortName}';
+          final subtitle = cheapest.unitPriceText.isNotEmpty
+              ? '${cheapest.unitPriceText} on ${cheapest.retailer.shortName}'
+              : '${variant.label} lowest on ${cheapest.retailer.shortName}';
+          return (
+            id: c.id,
+            title: '${product.name} (${variant.label})',
+            subtitle: subtitle,
+            tag: tag,
+            pastel: c.pastel,
+            productId: product.id,
+            variantIdx: vIdx,
+          );
+        })
+        .whereType<({
+          String id,
+          String title,
+          String subtitle,
+          String tag,
+          SastaPastel pastel,
+          String productId,
+          int variantIdx,
+        })>()
+        .toList();
 
     if (picks.isEmpty) return const SizedBox.shrink();
 
@@ -977,6 +1052,7 @@ class _SmartPicksSection extends StatelessWidget {
             onAction: () => SastaNav.openSearchResults(
               context,
               titleOverride: 'Smart picks',
+              dealsOnly: true,
             ),
           ),
         ),
@@ -1130,10 +1206,17 @@ class _ExploreBrandsSection extends StatelessWidget {
 }
 
 class _HomeSavingsCard extends StatelessWidget {
-  const _HomeSavingsCard();
+  const _HomeSavingsCard({required this.state});
+  final SastaAppState state;
 
   @override
   Widget build(BuildContext context) {
+    final comp = state.computeBasketComparison();
+    final saving = comp.savingsVsPriciest;
+    final bestStore = comp.cheapestCompleteStore?.retailer.shortName ??
+        (comp.splitSlices.isNotEmpty
+            ? comp.splitSlices.first.retailer.shortName
+            : null);
     return SastaCard(
       gradient: const LinearGradient(
         begin: Alignment.topLeft,
@@ -1177,13 +1260,15 @@ class _HomeSavingsCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 4),
-                const FittedBox(
+                FittedBox(
                   fit: BoxFit.scaleDown,
                   alignment: Alignment.centerLeft,
-                  child: PriceGradientText('₹312', size: 42),
+                  child: PriceGradientText('₹$saving', size: 42),
                 ),
                 Text(
-                  'Most economical so far: Zepto\nEstimated, not confirmed purchases',
+                  saving > 0
+                      ? 'Best option now: ${bestStore ?? 'Compare'}\nEstimated on ${state.activeBasket.name}, not confirmed purchases'
+                      : 'Add items to ${state.activeBasket.name} to estimate store spread',
                   style: SastaText.body(
                     context,
                     size: 12,
@@ -1236,7 +1321,10 @@ class _HomePriceAlertsCard extends StatelessWidget {
                 final product = state.productById(alert.productId);
                 if (product == null) return const SizedBox.shrink();
                 final current = product
-                        .cheapestQuote(product.defaultVariantIndex)
+                        .cheapestQuote(
+                          product.defaultVariantIndex,
+                          enabledRetailers: state.enabledRetailers,
+                        )
                         ?.price ??
                     alert.targetPrice;
                 final progress =
@@ -1306,11 +1394,23 @@ class _HomePriceAlertsCard extends StatelessWidget {
 }
 
 class _MonthlySavingsCard extends StatelessWidget {
-  const _MonthlySavingsCard();
+  const _MonthlySavingsCard({required this.state});
+  final SastaAppState state;
 
   @override
   Widget build(BuildContext context) {
     final palette = context.sasta;
+    final comp = state.computeBasketComparison();
+    final currentSaving = comp.savingsVsPriciest;
+    final pct = comp.percentSavedVsPriciest;
+    final singleTotal = comp.cheapestCompleteStore?.totalPrice ?? comp.splitTotal;
+    final splitSavings = currentSaving + comp.splitSavingsOverBestSingle;
+    final maxBar = splitSavings > currentSaving ? splitSavings : currentSaving;
+    final singleFrac =
+        maxBar > 0 ? (currentSaving / maxBar).clamp(0.24, 1.0) : 0.24;
+    final splitFrac =
+        maxBar > 0 ? (splitSavings / maxBar).clamp(0.24, 1.0) : 0.24;
+
     return SastaCard(
       color: palette.lavender,
       shadow: false,
@@ -1322,12 +1422,12 @@ class _MonthlySavingsCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  'Your monthly savings',
+                  'Basket savings breakdown',
                   style: SastaText.display(context, size: 19),
                 ),
               ),
               SastaTag(
-                label: '+16%',
+                label: pct > 0 ? '-$pct% spread' : 'Compare',
                 backgroundColor: palette.mint,
                 textColor: palette.successText,
               ),
@@ -1339,16 +1439,16 @@ class _MonthlySavingsCard extends StatelessWidget {
             children: [
               Expanded(
                 child: _MonthBar(
-                  label: 'Oct · ₹268',
-                  fraction: 0.72,
+                  label: '1 store · ₹$currentSaving ($singleTotal total)',
+                  fraction: singleFrac,
                   color: SastaColors.mutedGrey,
                 ),
               ),
               const SizedBox(width: 14),
-              const Expanded(
+              Expanded(
                 child: _MonthBar(
-                  label: 'Nov · ₹312',
-                  fraction: 0.92,
+                  label: 'Split · ₹$splitSavings',
+                  fraction: splitFrac,
                   color: SastaColors.chartLinePurple,
                 ),
               ),
@@ -1519,6 +1619,7 @@ class _RecentlyComparedSection extends StatelessWidget {
                   ProductArtTile(
                     kind: entry.artKind,
                     pastel: entry.pastel,
+                    imageUrl: entry.imageUrl,
                     size: 48,
                   ),
                   const SizedBox(width: 12),
@@ -1592,11 +1693,31 @@ class _RecentlyViewedSection extends StatelessWidget {
                 GestureDetector(
                   onTap: () =>
                       SastaNav.openProductDetails(context, items[i].id),
-                  child: ProductArtTile(
-                    kind: items[i].artKind,
-                    pastel: items[i].pastel,
-                    size: 96,
-                    borderRadius: 28,
+                  child: SizedBox(
+                    width: 98,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        ProductArtTile(
+                          kind: items[i].artKind,
+                          pastel: items[i].pastel,
+                          imageUrl: items[i].bestImageUrl,
+                          size: 96,
+                          borderRadius: 28,
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          items[i].name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: SastaText.body(
+                            context,
+                            size: 12,
+                            weight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],

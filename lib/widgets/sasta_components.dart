@@ -349,42 +349,46 @@ class SastaOutlineButton extends StatelessWidget {
     final palette = context.sasta;
     final fg = textColor ?? palette.ink;
     final border = borderColor ?? palette.ink;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onPressed,
-        borderRadius: BorderRadius.circular(height / 2),
-        child: Container(
-          height: height,
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 18),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(height / 2),
-            border: Border.all(color: border, width: 2),
-          ),
-          alignment: Alignment.center,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              if (leading != null) ...[
-                leading!,
-                const SizedBox(width: 8),
-              ],
-              Flexible(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: SastaText.body(
-                    context,
-                    size: 16,
-                    weight: FontWeight.w700,
-                    color: fg,
+    return AnimatedOpacity(
+      duration: SastaMotion.fast,
+      opacity: onPressed == null ? 0.45 : 1.0,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(height / 2),
+          child: Container(
+            height: height,
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 18),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(height / 2),
+              border: Border.all(color: border, width: 2),
+            ),
+            alignment: Alignment.center,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (leading != null) ...[
+                  leading!,
+                  const SizedBox(width: 8),
+                ],
+                Flexible(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: SastaText.body(
+                      context,
+                      size: 16,
+                      weight: FontWeight.w700,
+                      color: fg,
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -1183,12 +1187,16 @@ class BasketFloatingBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.sasta;
     return Container(
       margin: const EdgeInsets.fromLTRB(SastaSpace.page, 0, SastaSpace.page, 10),
       padding: const EdgeInsets.fromLTRB(16, 10, 10, 10),
       decoration: BoxDecoration(
-        color: SastaColors.ink,
+        color: palette.isDark ? const Color(0xFF1E293B) : SastaColors.ink,
         borderRadius: BorderRadius.circular(32),
+        border: palette.isDark
+            ? Border.all(color: palette.divider, width: 1.5)
+            : null,
         boxShadow: SastaShadows.cta(context),
       ),
       child: Row(
@@ -1264,12 +1272,18 @@ void showSastaToast(BuildContext context, String message) {
   final messenger = ScaffoldMessenger.maybeOf(context);
   if (messenger == null) return;
   final palette = context.sasta;
+  final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
   messenger
     ..hideCurrentSnackBar()
     ..showSnackBar(
       SnackBar(
         behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.fromLTRB(22, 0, 22, 24),
+        margin: EdgeInsets.fromLTRB(
+          22,
+          0,
+          22,
+          keyboardOpen ? 18 : SastaSizes.navHeight + 28,
+        ),
         backgroundColor: palette.primaryCtaBg,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         duration: const Duration(milliseconds: 2200),

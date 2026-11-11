@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 
+import '../../app/sasta_routes.dart';
 import '../../data/sasta_app_state.dart';
 import '../../models/models.dart';
 import '../../theme/sasta_theme.dart';
 import '../../theme/sasta_tokens.dart';
 import '../../widgets/sasta_background.dart';
 import '../../widgets/sasta_components.dart';
+import '../../widgets/sasta_mascot.dart';
 import '../../widgets/sasta_sheets.dart';
 
 class SubHistoryScreen extends StatelessWidget {
@@ -95,75 +97,111 @@ class SubHistoryScreen extends StatelessWidget {
               children: [
                 const SastaHeaderBar(title: 'Subscription history'),
                 const SizedBox(height: 18),
-                for (final invoice in state.invoices) ...[
+                if (state.invoices.isEmpty)
                   SastaCard(
+                    color: palette.field,
+                    shadow: false,
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                invoice.planName,
-                                style: SastaText.body(
-                                  context,
-                                  size: 16,
-                                  weight: FontWeight.w800,
-                                ),
-                              ),
-                            ),
-                            Text(
-                              '₹${invoice.amount}',
-                              style: SastaText.display(context, size: 22),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${invoice.dateLabel} · ${invoice.txnCode}',
-                          style: SastaText.muted(context, size: 13),
+                        const SastaMascot(
+                          size: 72,
+                          color: SastaColors.gold,
+                          expression: MascotExpression.calm,
                         ),
                         const SizedBox(height: 12),
-                        SizedBox(
-                          width: double.infinity,
-                          child: Wrap(
-                            alignment: WrapAlignment.spaceBetween,
-                            crossAxisAlignment: WrapCrossAlignment.center,
-                            spacing: 8,
-                            runSpacing: 4,
-                            children: [
-                              _StatusTag(status: invoice.status),
-                              TextButton(
-                                onPressed: () =>
-                                    _showInvoiceSheet(context, invoice),
-                                style: TextButton.styleFrom(
-                                  padding: EdgeInsets.zero,
-                                  minimumSize: const Size(44, 36),
-                                  tapTargetSize:
-                                      MaterialTapTargetSize.shrinkWrap,
-                                ),
-                                child: Text(
-                                  'View invoice',
-                                  style: SastaText.body(
-                                    context,
-                                    size: 13,
-                                    weight: FontWeight.w700,
-                                    decoration: TextDecoration.underline,
-                                  ),
-                                ),
-                              ),
-                            ],
+                        Text(
+                          'No billing history yet',
+                          textAlign: TextAlign.center,
+                          style: SastaText.display(context, size: 20),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Your Sasta+ billing receipts will appear here after you subscribe.',
+                          textAlign: TextAlign.center,
+                          style: SastaText.muted(context, size: 13),
+                        ),
+                        const SizedBox(height: 16),
+                        SastaPrimaryButton(
+                          label: 'Explore Sasta+',
+                          onPressed: () => SastaNav.push(
+                            context,
+                            SastaRouteNames.plusLanding,
                           ),
                         ),
                       ],
                     ),
-                  ),
-                  const SizedBox(height: 12),
+                  )
+                else ...[
+                  for (final invoice in state.invoices) ...[
+                    SastaCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  invoice.planName,
+                                  style: SastaText.body(
+                                    context,
+                                    size: 16,
+                                    weight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                              Text(
+                                '₹${invoice.amount}',
+                                style: SastaText.display(context, size: 22),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${invoice.dateLabel} · ${invoice.txnCode}',
+                            style: SastaText.muted(context, size: 13),
+                          ),
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            width: double.infinity,
+                            child: Wrap(
+                              alignment: WrapAlignment.spaceBetween,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              spacing: 8,
+                              runSpacing: 4,
+                              children: [
+                                _StatusTag(status: invoice.status),
+                                TextButton(
+                                  onPressed: () =>
+                                      _showInvoiceSheet(context, invoice),
+                                  style: TextButton.styleFrom(
+                                    padding: EdgeInsets.zero,
+                                    minimumSize: const Size(44, 36),
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                  child: Text(
+                                    'View invoice',
+                                    style: SastaText.body(
+                                      context,
+                                      size: 13,
+                                      weight: FontWeight.w700,
+                                      decoration: TextDecoration.underline,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                 ],
                 const SizedBox(height: 6),
                 Center(
                   child: Text(
-                    'Sample data · GST invoices sent to your registered email',
+                    'Receipts are saved locally on this device for your reference.',
                     style: SastaText.muted(
                       context,
                       size: 12,

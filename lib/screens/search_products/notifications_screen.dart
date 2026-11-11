@@ -155,6 +155,47 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                 } else if (item.kind ==
                                     NotificationKind.savings) {
                                   showMonthlySavingsSheet(context);
+                                } else if (item.kind ==
+                                    NotificationKind.update) {
+                                  showSastaSheet(
+                                    context: context,
+                                    builder: (ctx) => Padding(
+                                      padding: const EdgeInsets.fromLTRB(
+                                        22,
+                                        18,
+                                        22,
+                                        28,
+                                      ),
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.stretch,
+                                        children: [
+                                          Text(
+                                            item.title,
+                                            style: SastaText.display(
+                                              ctx,
+                                              size: 22,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            '${item.subtitle} · ${item.timeLabel}',
+                                            style: SastaText.muted(
+                                              ctx,
+                                              size: 14,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 18),
+                                          SastaPrimaryButton(
+                                            label: 'Got it',
+                                            onPressed: () =>
+                                                Navigator.of(ctx).pop(),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
                                 }
                               },
                               borderRadius: BorderRadius.circular(18),

@@ -138,26 +138,30 @@ class _SastaShellState extends State<SastaShell> {
   }
 }
 
+T? _routeArg<T>(Object? args) => args is T ? args : null;
+
 Route<dynamic> onGenerateSastaRoute(RouteSettings settings) {
+  final args = settings.arguments;
+  final checkoutArgs = _routeArg<CheckoutArgs>(args);
   final Widget page = switch (settings.name) {
     SastaRouteNames.homeSearch => const HomeSearchScreen(),
     SastaRouteNames.categories => const CategoriesScreen(),
     SastaRouteNames.searchResults => SearchResultsScreen(
-        args: settings.arguments as SearchResultsArgs?,
+        args: _routeArg<SearchResultsArgs>(args),
       ),
     SastaRouteNames.productCompare => ProductCompareScreen(
-        args: settings.arguments as ProductRouteArgs?,
+        args: _routeArg<ProductRouteArgs>(args),
       ),
     SastaRouteNames.productDetails => ProductDetailsScreen(
-        args: settings.arguments as ProductRouteArgs?,
+        args: _routeArg<ProductRouteArgs>(args),
       ),
     SastaRouteNames.priceHistory => PriceHistoryScreen(
-        args: settings.arguments as ProductRouteArgs?,
+        args: _routeArg<ProductRouteArgs>(args),
       ),
     SastaRouteNames.searchHistory => const SearchHistoryScreen(),
     SastaRouteNames.notifications => const NotificationsScreen(),
     SastaRouteNames.basketCompare => BasketCompareScreen(
-        args: settings.arguments as BasketCompareArgs?,
+        args: _routeArg<BasketCompareArgs>(args),
       ),
     SastaRouteNames.favouritesPush => const FavouritesScreen(isTabRoot: false),
     SastaRouteNames.personalInfo => const PersonalInfoScreen(),
@@ -170,22 +174,20 @@ Route<dynamic> onGenerateSastaRoute(RouteSettings settings) {
     SastaRouteNames.pincodePicker => const PincodeScreen(isModalPicker: true),
     SastaRouteNames.plusLanding => const PlusLandingScreen(),
     SastaRouteNames.plusPlans => PlansScreen(
-        initialPlan: (settings.arguments as CheckoutArgs?)?.planType ??
-            SastaPlanType.yearly,
+        initialPlan: checkoutArgs?.planType ?? SastaPlanType.yearly,
       ),
     SastaRouteNames.plusCheckout => CheckoutScreen(
-        planType: (settings.arguments as CheckoutArgs?)?.planType ??
-            SastaPlanType.yearly,
+        planType: checkoutArgs?.planType ?? SastaPlanType.yearly,
       ),
     SastaRouteNames.plusSuccess => PaySuccessScreen(
-        planType: (settings.arguments as CheckoutArgs?)?.planType ??
-            SastaPlanType.yearly,
+        planType: checkoutArgs?.planType ?? SastaPlanType.yearly,
+        paymentMethod: checkoutArgs?.paymentMethod ?? 'UPI',
       ),
     SastaRouteNames.plusManage => const ManageMembershipScreen(),
     SastaRouteNames.plusHistory => const SubHistoryScreen(),
     SastaRouteNames.helpCentre => const HelpCentreScreen(),
     SastaRouteNames.faq => FaqScreen(
-        initialCategory: settings.arguments as String?,
+        initialCategory: _routeArg<String>(args),
       ),
     SastaRouteNames.contactSupport => const ContactSupportScreen(),
     SastaRouteNames.sendFeedback => const FeedbackScreen(),

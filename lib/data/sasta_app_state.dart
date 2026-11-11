@@ -19,17 +19,23 @@ class SastaAppState extends ChangeNotifier {
     RetailerLauncherService? retailerLauncher,
     SastaShareService? shareService,
     QuickCommerceRepository? repository,
+    QuickCommerceApiConfig? defaultApiConfig,
   })  : _storage = storage,
         _locationService = locationService ?? PincodeLocationService(),
         _ownsLocationService = locationService == null,
         _retailerLauncher = retailerLauncher ?? RetailerLauncherService(),
         _shareService = shareService ?? SastaShareService(),
-        _hasCustomRepo = repository != null {
+        _hasCustomRepo = repository != null,
+        _defaultApiConfig = defaultApiConfig {
     if (repository != null) {
       _repository = repository;
       _apiBaseUrl = repository.config.baseUrl;
       _apiKey = repository.config.apiKey;
     } else {
+      if (_apiBaseUrl.isEmpty && defaultApiConfig != null) {
+        _apiBaseUrl = defaultApiConfig.baseUrl;
+        _apiKey = defaultApiConfig.apiKey;
+      }
       _repository = HttpQuickCommerceRepository(
         config: QuickCommerceApiConfig(
           baseUrl: _apiBaseUrl,
@@ -47,6 +53,7 @@ class SastaAppState extends ChangeNotifier {
     RetailerLauncherService? retailerLauncher,
     SastaShareService? shareService,
     QuickCommerceRepository? repository,
+    QuickCommerceApiConfig? defaultApiConfig,
     bool syncIfConfigured = true,
   }) async {
     final state = SastaAppState(
@@ -55,9 +62,13 @@ class SastaAppState extends ChangeNotifier {
       retailerLauncher: retailerLauncher,
       shareService: shareService,
       repository: repository,
+      defaultApiConfig: defaultApiConfig,
     );
     await state.loadFromStorage();
-    if (syncIfConfigured && state.hasSetPincode && state.isApiConfigured) {
+    if (syncIfConfigured &&
+        state.hasSetPincode &&
+        state.isApiConfigured &&
+        !state.onDemandLiveMode) {
       unawaited(state.syncCatalogForLocation());
     }
     return state;
@@ -69,21 +80,32 @@ class SastaAppState extends ChangeNotifier {
   final RetailerLauncherService _retailerLauncher;
   final SastaShareService _shareService;
   final bool _hasCustomRepo;
+  final QuickCommerceApiConfig? _defaultApiConfig;
   late QuickCommerceRepository _repository;
 
   Timer? _saveTimer;
   bool _isHydrating = false;
   bool _isDisposed = false;
+  int _syncSeq = 0;
+  int _searchSeq = 0;
 
   // Dynamic catalog + Quick-Commerce API sync state
   List<Product> _products = List<Product>.from(MockCatalog.products);
   String _apiBaseUrl = QuickCommerceApiConfig.envBaseUrl;
   String _apiKey = QuickCommerceApiConfig.envApiKey;
   bool _isCatalogSyncing = false;
+  bool _isSearchingRemote = false;
   bool _isLiveCatalogActive = false;
   DateTime? _lastSyncedAt;
+  String? _lastSyncedPincode;
+  Set<RetailerId> _lastSyncedRetailers = const {};
   String? _lastSyncError;
+  int? _creditsRemaining;
   List<RetailerId> _serviceableRetailers = const [];
+  final Map<RetailerId, String> _retailerEtas = {};
+  bool? _onDemandLiveModeOverride;
+  String _dailyLiveSearchDate = '';
+  int _dailyLiveSearchesUsed = 0;
 
   // Flow & demo states
   bool _hasCompletedSplash = false;
@@ -371,7 +393,8 @@ class SastaAppState extends ChangeNotifier {
   // Sasta+ subscription
   SastaPlanType _planType = SastaPlanType.free;
   bool _autoRenew = true;
-  final List<SubscriptionInvoice> _invoices = List.of(MockCatalog.defaultInvoices);
+  final List<SubscriptionInvoice> _invoices = [];
+  int _avatarStyleIndex = 0;
 
   // Support tickets
   final List<SupportTicket> _supportTickets = [
@@ -404,12 +427,20 @@ class SastaAppState extends ChangeNotifier {
   ThemeMode get themeMode => _themeMode;
   int get activeTabIndex => _activeTabIndex;
 
+  int get avatarStyleIndex => _avatarStyleIndex;
+
+  void cycleAvatarStyle() {
+    _avatarStyleIndex = (_avatarStyleIndex + 1) % 4;
+    notifyListeners();
+  }
+
   String get fullName => _fullName;
   String get email => _email;
   String get phone => _phone;
   String get maskedPhone {
-    if (_phone.length >= 10) {
-      return '+91 ••••• ${_phone.substring(_phone.length - 5)}';
+    final digits = _phone.replaceAll(RegExp(r'\D'), '');
+    if (digits.length >= 5) {
+      return '+91 ••••• ${digits.substring(digits.length - 5)}';
     }
     return '+91 ••••• •••••';
   }
@@ -474,13 +505,78 @@ class SastaAppState extends ChangeNotifier {
   List<Product> get products => List.unmodifiable(_products);
   String get apiBaseUrl => _apiBaseUrl;
   String get apiKey => _apiKey;
+  static const int freeDailyLiveSearchLimit = 3;
+
   bool get isApiConfigured => _repository.isConfigured;
+  bool get isQuickCommerceDirect => _repository.config.isQuickCommerceDirect;
+  bool get onDemandLiveMode => _onDemandLiveModeOverride ?? isQuickCommerceDirect;
+  bool get hasUnlimitedLiveSearches => isPlusActive || !isQuickCommerceDirect;
+  int get estimatedCreditsPerSearch =>
+      _enabledRetailers.isEmpty ? 4 : _enabledRetailers.length;
+  int get liveNetworkRequestsMade => _repository.liveNetworkRequestsMade;
+
+  String _todayDateKey() =>
+      DateTime.now().toIso8601String().substring(0, 10);
+
+  int get dailyLiveSearchesUsed =>
+      _dailyLiveSearchDate == _todayDateKey() ? _dailyLiveSearchesUsed : 0;
+
+  int? get remainingFreeLiveSearches => hasUnlimitedLiveSearches
+      ? null
+      : (freeDailyLiveSearchLimit - dailyLiveSearchesUsed)
+          .clamp(0, freeDailyLiveSearchLimit);
+
+  bool get isLiveQuotaExhausted =>
+      !hasUnlimitedLiveSearches && (remainingFreeLiveSearches ?? 0) <= 0;
+
+  void _recordLiveNetworkSearch() {
+    final today = _todayDateKey();
+    if (_dailyLiveSearchDate != today) {
+      _dailyLiveSearchDate = today;
+      _dailyLiveSearchesUsed = 0;
+    }
+    _dailyLiveSearchesUsed++;
+  }
+
+  bool hasFreshCacheFor({
+    String query = 'milk',
+    String? categoryId,
+    bool? isHomeQuery,
+  }) {
+    if (!isApiConfigured) return false;
+    final loc = activeLocation;
+    final fallback = (loc.lat == null || loc.lng == null)
+        ? PincodeLocationService.fallbackCoordinatesSync(loc.pincode)
+        : null;
+    return _repository.hasFreshQueryCache(
+      pincode: loc.pincode,
+      query: query,
+      categoryId: categoryId,
+      lat: loc.lat ?? fallback?.lat,
+      lng: loc.lng ?? fallback?.lng,
+      retailers: _enabledRetailers,
+      isHomeQuery: isHomeQuery ??
+          (categoryId == null && query.trim().toLowerCase() == 'milk'),
+    );
+  }
+
+  void setOnDemandLiveMode(bool value) {
+    if (onDemandLiveMode == value) return;
+    _onDemandLiveModeOverride = value;
+    notifyListeners();
+  }
+
   bool get isCatalogSyncing => _isCatalogSyncing;
+  bool get isSearchingRemote => _isSearchingRemote;
   bool get isLiveCatalogActive => _isLiveCatalogActive;
   DateTime? get lastSyncedAt => _lastSyncedAt;
   String? get lastSyncError => _lastSyncError;
+  int? get apiCreditsRemaining =>
+      _creditsRemaining ?? _repository.lastCreditsRemaining;
   List<RetailerId> get serviceableRetailers =>
       List.unmodifiable(_serviceableRetailers);
+  String etaFor(RetailerId retailer) =>
+      _retailerEtas[retailer] ?? retailer.eta;
 
   PincodeLocationService get locationService => _locationService;
   RetailerLauncherService get retailerLauncher => _retailerLauncher;
@@ -526,15 +622,32 @@ class SastaAppState extends ChangeNotifier {
       if (s.userEmail != null) _email = s.userEmail!;
       if (s.userPhone != null) _phone = s.userPhone!;
       if (s.phoneVerified != null) _phoneVerified = s.phoneVerified!;
-      if (s.isDarkMode != null) {
+      if (s.themeModeName != null) {
+        switch (s.themeModeName) {
+          case 'dark':
+            _themeMode = ThemeMode.dark;
+          case 'system':
+            _themeMode = ThemeMode.system;
+          default:
+            _themeMode = ThemeMode.light;
+        }
+      } else if (s.isDarkMode != null) {
         _themeMode = s.isDarkMode! ? ThemeMode.dark : ThemeMode.light;
       }
       if (s.useLocation != null) {
         _pushNotificationsAll = s.useLocation!;
       }
       if (s.priceDropAlerts != null) _priceDropsNotif = s.priceDropAlerts!;
+      if (s.targetAlertsNotif != null) {
+        _targetAlertsNotif = s.targetAlertsNotif!;
+      }
       if (s.backInStockAlerts != null) _backInStockNotif = s.backInStockAlerts!;
+      if (s.newDealsNotif != null) _newDealsNotif = s.newDealsNotif!;
+      if (s.basketSavingsNotif != null) {
+        _basketSavingsNotif = s.basketSavingsNotif!;
+      }
       if (s.weeklyDigest != null) _weeklySummaryNotif = s.weeklyDigest!;
+      if (s.appUpdatesNotif != null) _appUpdatesNotif = s.appUpdatesNotif!;
 
       if (s.enabledRetailerIds != null && s.enabledRetailerIds!.isNotEmpty) {
         final parsed = s.enabledRetailerIds!
@@ -551,8 +664,12 @@ class SastaAppState extends ChangeNotifier {
       if (s.hideOos != null) _includeUnavailable = !s.hideOos!;
       if (s.showUnitPrice != null) _showUnitPrices = s.showUnitPrice!;
       if (s.autoMatchVariants != null) _matchPackSizes = s.autoMatchVariants!;
+      if (s.suggestAlternatives != null) {
+        _suggestAlternatives = s.suggestAlternatives!;
+      }
       if (s.basketMode != null) _defaultBasketMode = s.basketMode!;
       if (s.selectedPlan != null) _planType = s.selectedPlan!;
+      if (s.autoRenew != null) _autoRenew = s.autoRenew!;
 
       if (s.savedLocations != null && s.savedLocations!.isNotEmpty) {
         _locations
@@ -623,25 +740,77 @@ class SastaAppState extends ChangeNotifier {
           ..addAll(s.invoices!);
       }
 
-      if (!_hasCustomRepo &&
-          (s.apiBaseUrl != null || s.apiKey != null)) {
-        _apiBaseUrl = s.apiBaseUrl ?? _apiBaseUrl;
-        _apiKey = s.apiKey ?? _apiKey;
-        _repository = HttpQuickCommerceRepository(
-          config: QuickCommerceApiConfig(
-            baseUrl: _apiBaseUrl,
-            apiKey: _apiKey,
-          ),
-        );
+      if (!_hasCustomRepo) {
+        final savedUrl = s.apiBaseUrl?.trim() ?? '';
+        final savedKey = s.apiKey?.trim() ?? '';
+        if (savedUrl.isNotEmpty) {
+          _apiBaseUrl = savedUrl;
+          _apiKey = savedKey;
+          _repository.dispose();
+          _repository = HttpQuickCommerceRepository(
+            config: QuickCommerceApiConfig(
+              baseUrl: _apiBaseUrl,
+              apiKey: _apiKey,
+            ),
+          );
+        } else if (s.apiBaseUrl != null) {
+          _apiBaseUrl = '';
+          _apiKey = savedKey;
+          _repository.dispose();
+          _repository = HttpQuickCommerceRepository(
+            config: QuickCommerceApiConfig(
+              baseUrl: _apiBaseUrl,
+              apiKey: _apiKey,
+            ),
+          );
+        }
       }
       if (s.lastSyncedAtIso != null) {
         _lastSyncedAt = DateTime.tryParse(s.lastSyncedAtIso!);
       }
+      if (s.onDemandLiveMode != null) {
+        _onDemandLiveModeOverride = s.onDemandLiveMode;
+      }
+      if (s.dailyLiveSearchDate != null) {
+        _dailyLiveSearchDate = s.dailyLiveSearchDate!;
+      }
+      if (s.dailyLiveSearchesUsed != null) {
+        _dailyLiveSearchesUsed = s.dailyLiveSearchesUsed!;
+      }
+      if (s.serviceableRetailerIds != null) {
+        _serviceableRetailers = s.serviceableRetailerIds!
+            .map(RetailerId.tryParse)
+            .whereType<RetailerId>()
+            .toList();
+      }
+      if (s.retailerEtas != null) {
+        _retailerEtas.clear();
+        s.retailerEtas!.forEach((key, value) {
+          final r = RetailerId.tryParse(key);
+          if (r != null && value.trim().isNotEmpty) {
+            _retailerEtas[r] = value;
+          }
+        });
+      }
       if (s.cachedProducts != null && s.cachedProducts!.isNotEmpty) {
-        _products = _mergeProductLists(s.cachedProducts!, _products);
+        final pinPrefix = 'qc_${activeLocation.pincode}_';
+        final matchingLive = s.cachedProducts!
+            .where((p) => !p.isLiveProduct || p.id.startsWith(pinPrefix))
+            .toList();
+        _products = _mergeProductLists(matchingLive, _products);
         if (_lastSyncedAt != null && _apiBaseUrl.isNotEmpty) {
-          _isLiveCatalogActive = true;
+          _isLiveCatalogActive = matchingLive.isNotEmpty;
+          _lastSyncedPincode = s.pincode ?? activeLocation.pincode;
+          _lastSyncedRetailers = Set<RetailerId>.from(_enabledRetailers);
         }
+      }
+      if (s.queryCacheTimestampsMs != null &&
+          s.queryCacheTimestampsMs!.isNotEmpty) {
+        _repository.hydrateQueryCache(
+          timestampsMs: s.queryCacheTimestampsMs!,
+          productIdsByKey: s.queryCacheProductIds ?? const {},
+          products: _products,
+        );
       }
 
       if (s.isOnboarded == true) {
@@ -666,18 +835,25 @@ class SastaAppState extends ChangeNotifier {
       area: loc.area,
       isOnboarded: _hasSeenOnboarding && _hasSetPincode && !_isLoggedOut,
       isDarkMode: _themeMode == ThemeMode.dark,
+      themeModeName: _themeMode.name,
       useLocation: _pushNotificationsAll,
       priceDropAlerts: _priceDropsNotif,
+      targetAlertsNotif: _targetAlertsNotif,
       backInStockAlerts: _backInStockNotif,
+      newDealsNotif: _newDealsNotif,
+      basketSavingsNotif: _basketSavingsNotif,
       weeklyDigest: _weeklySummaryNotif,
+      appUpdatesNotif: _appUpdatesNotif,
       enabledRetailerIds: _enabledRetailers.map((e) => e.id).toList(),
       sortMode: _defaultSort,
       hideOos: !_includeUnavailable,
       showUnitPrice: _showUnitPrices,
       deliveryFeeMode: 'default',
       autoMatchVariants: _matchPackSizes,
+      suggestAlternatives: _suggestAlternatives,
       basketMode: _defaultBasketMode,
       selectedPlan: _planType,
+      autoRenew: _autoRenew,
       activeBasketId: _activeBasketId,
       recentlyViewedIds: List.of(_recentlyViewedIds),
       apiBaseUrl: _apiBaseUrl,
@@ -694,6 +870,14 @@ class SastaAppState extends ChangeNotifier {
       tickets: List.of(_supportTickets),
       invoices: List.of(_invoices),
       cachedProducts: _isLiveCatalogActive ? List.of(_products) : null,
+      onDemandLiveMode: _onDemandLiveModeOverride,
+      queryCacheTimestampsMs: _repository.exportQueryCacheTimestampsMs(),
+      queryCacheProductIds: _repository.exportQueryCacheProductIds(),
+      dailyLiveSearchDate: _dailyLiveSearchDate.isEmpty ? null : _dailyLiveSearchDate,
+      dailyLiveSearchesUsed: _dailyLiveSearchesUsed,
+      serviceableRetailerIds:
+          _serviceableRetailers.map((e) => e.id).toList(),
+      retailerEtas: _retailerEtas.map((k, v) => MapEntry(k.id, v)),
     );
   }
 
@@ -718,10 +902,30 @@ class SastaAppState extends ChangeNotifier {
     String apiKey = '',
     bool syncNow = true,
   }) async {
-    _apiBaseUrl = baseUrl.trim();
-    _apiKey = apiKey.trim();
+    final nextUrl = baseUrl.trim();
+    final nextKey = apiKey.trim();
+    final configChanged = nextUrl != _apiBaseUrl || nextKey != _apiKey;
+    _apiBaseUrl = nextUrl;
+    _apiKey = nextKey;
     _lastSyncError = null;
+    _creditsRemaining = null;
+    if (configChanged) {
+      ++_syncSeq;
+      ++_searchSeq;
+      _isCatalogSyncing = false;
+      _isSearchingRemote = false;
+      _lastSyncedAt = null;
+      _lastSyncedPincode = null;
+      _lastSyncedRetailers = const {};
+      _serviceableRetailers = const [];
+      _retailerEtas.clear();
+      _products = _products.where((p) => !p.isLiveProduct).toList();
+      _isLiveCatalogActive = false;
+    } else {
+      _lastSyncedPincode = null;
+    }
     if (!_hasCustomRepo) {
+      _repository.dispose();
       _repository = HttpQuickCommerceRepository(
         config: QuickCommerceApiConfig(
           baseUrl: _apiBaseUrl,
@@ -731,18 +935,64 @@ class SastaAppState extends ChangeNotifier {
     }
     if (!isApiConfigured) {
       _isLiveCatalogActive = false;
+      _lastSyncedAt = null;
+      _lastSyncedPincode = null;
+      _lastSyncedRetailers = const {};
+      _serviceableRetailers = const [];
+      _retailerEtas.clear();
+      _products = _products.where((p) => !p.isLiveProduct).toList();
       notifyListeners();
       return false;
     }
     notifyListeners();
     if (syncNow) {
-      return syncCatalogForLocation();
+      return syncCatalogForLocation(forceRefresh: true);
     }
     return true;
   }
 
+  Future<({double lat, double lng})> _resolveActiveCoordinates({
+    double? lat,
+    double? lng,
+  }) async {
+    if (lat != null && lng != null) {
+      return (lat: lat, lng: lng);
+    }
+    final current = activeLocation;
+    if (current.lat != null && current.lng != null) {
+      return (lat: current.lat!, lng: current.lng!);
+    }
+    final coords =
+        await _locationService.resolveCoordinatesForPincode(current.pincode);
+    if (!_isDisposed) {
+      final idx = _locations.indexWhere((l) => l.id == current.id);
+      if (idx != -1) {
+        _locations[idx] = _locations[idx].copyWith(
+          lat: coords.lat,
+          lng: coords.lng,
+        );
+      }
+    }
+    return coords;
+  }
+
+  /// Queries remaining QuickCommerceAPI credits without consuming credits.
+  Future<QuickCommerceCreditInfo?> refreshCreditsBalance() async {
+    if (!isApiConfigured) return null;
+    final info = await _repository.fetchCreditsBalance();
+    if (info != null && !_isDisposed) {
+      _creditsRemaining = info.totalAvailable;
+      notifyListeners();
+    }
+    return info;
+  }
+
   /// Pulls live catalog prices for the active pincode from the Quick-Commerce API.
-  Future<bool> syncCatalogForLocation({double? lat, double? lng}) async {
+  Future<bool> syncCatalogForLocation({
+    double? lat,
+    double? lng,
+    bool forceRefresh = false,
+  }) async {
     if (_isDisposed) return false;
     if (!isApiConfigured) {
       _isLiveCatalogActive = false;
@@ -750,38 +1000,94 @@ class SastaAppState extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+
+    final currentPin = activeLocation.pincode;
+    final requestedRetailers = Set<RetailerId>.from(_enabledRetailers);
+    if (!forceRefresh &&
+        _isLiveCatalogActive &&
+        _lastSyncedPincode == currentPin &&
+        _lastSyncedRetailers.length == requestedRetailers.length &&
+        _lastSyncedRetailers.containsAll(requestedRetailers) &&
+        _lastSyncedAt != null &&
+        DateTime.now().difference(_lastSyncedAt!) < const Duration(hours: 6)) {
+      return true;
+    }
+
+    final syncToken = ++_syncSeq;
     _isCatalogSyncing = true;
     _lastSyncError = null;
     notifyListeners();
 
     try {
+      final coords = await _resolveActiveCoordinates(lat: lat, lng: lng);
+      if (_isDisposed || syncToken != _syncSeq) return false;
+      final cachedHit = !forceRefresh &&
+          _repository.hasFreshQueryCache(
+            pincode: currentPin,
+            query: 'milk',
+            lat: coords.lat,
+            lng: coords.lng,
+            retailers: requestedRetailers,
+            isHomeQuery: true,
+          );
+      if (!cachedHit && isLiveQuotaExhausted) {
+        _lastSyncError =
+            'Daily free live refresh limit ($freeDailyLiveSearchLimit/day) reached. Cached catalog stays active.';
+        return false;
+      }
+
+      final beforeCalls = _repository.liveNetworkRequestsMade;
       final res = await _repository.fetchHomeCatalog(
-        pincode: activeLocation.pincode,
-        lat: lat,
-        lng: lng,
+        pincode: currentPin,
+        lat: coords.lat,
+        lng: coords.lng,
+        retailers: requestedRetailers,
+        forceRefresh: forceRefresh,
       );
-      if (_isDisposed) return false;
-      if (res.products.isNotEmpty) {
-        _products = _mergeProductLists(res.products, _products);
+      if (_isDisposed || syncToken != _syncSeq) return false;
+      if (_repository.liveNetworkRequestsMade > beforeCalls) {
+        _recordLiveNetworkSearch();
+      }
+      final pinPrefix = 'qc_${currentPin}_';
+      final retainedProducts = _products
+          .where((p) => !p.isLiveProduct || p.id.startsWith(pinPrefix))
+          .toList();
+      _products = res.products.isNotEmpty
+          ? _mergeProductLists(res.products, retainedProducts)
+          : retainedProducts;
+      if (_lastSyncedPincode != currentPin) {
+        _retailerEtas.clear();
       }
       _isLiveCatalogActive = true;
       _lastSyncedAt = res.syncedAt;
+      _lastSyncedPincode = currentPin;
+      _lastSyncedRetailers = requestedRetailers;
       _serviceableRetailers = res.serviceableRetailers;
+      if (res.etasByRetailer.isNotEmpty) {
+        _retailerEtas.addAll(res.etasByRetailer);
+      }
+      _creditsRemaining = res.creditsRemaining ??
+          _repository.lastCreditsRemaining ??
+          _creditsRemaining;
       if (res.area != null && res.area!.trim().isNotEmpty) {
         final idx = _locations.indexWhere((l) => l.isDefault);
-        if (idx != -1) {
-          _locations[idx] = _locations[idx].copyWith(area: res.area!.trim());
+        if (idx != -1 && _locations[idx].pincode == currentPin) {
+          _locations[idx] = _locations[idx].copyWith(
+            area: res.area!.trim(),
+            lat: coords.lat,
+            lng: coords.lng,
+          );
         }
       }
       return true;
     } on QuickCommerceApiException catch (e) {
-      _lastSyncError = e.message;
+      if (syncToken == _syncSeq) _lastSyncError = e.message;
       return false;
     } catch (e) {
-      _lastSyncError = 'Failed to sync catalog: $e';
+      if (syncToken == _syncSeq) _lastSyncError = 'Failed to sync catalog: $e';
       return false;
     } finally {
-      _isCatalogSyncing = false;
+      if (syncToken == _syncSeq) _isCatalogSyncing = false;
       if (!_isDisposed) notifyListeners();
     }
   }
@@ -794,22 +1100,60 @@ class SastaAppState extends ChangeNotifier {
     bool inStockOnly = false,
     int? maxPrice,
     String? sortBy,
+    bool forceRefresh = false,
   }) async {
-    if (isApiConfigured) {
-      try {
-        final remote = await _repository.searchProducts(
-          query: query,
-          pincode: activeLocation.pincode,
-          categoryId: categoryId,
-        );
-        if (remote.isNotEmpty) {
-          _products = _mergeProductLists(remote, _products);
-          _isLiveCatalogActive = true;
-          _lastSyncedAt = DateTime.now();
-          notifyListeners();
+    if (isApiConfigured && !_isDisposed) {
+      final isCached = !forceRefresh &&
+          hasFreshCacheFor(
+            query: query,
+            categoryId: categoryId,
+            isHomeQuery: false,
+          );
+      if (!isCached && isLiveQuotaExhausted) {
+        _lastSyncError =
+            'Daily free live search limit ($freeDailyLiveSearchLimit/day) reached. Showing cached prices.';
+        notifyListeners();
+      } else {
+        final searchToken = ++_searchSeq;
+        final requestedPin = activeLocation.pincode;
+        final requestedRetailers = Set<RetailerId>.from(_enabledRetailers);
+        _isSearchingRemote = true;
+        _lastSyncError = null;
+        notifyListeners();
+        try {
+          final coords = await _resolveActiveCoordinates();
+          if (_isDisposed || searchToken != _searchSeq) return const [];
+          final beforeCalls = _repository.liveNetworkRequestsMade;
+          final remote = await _repository.searchProducts(
+            query: query,
+            pincode: requestedPin,
+            categoryId: categoryId,
+            lat: coords.lat,
+            lng: coords.lng,
+            retailers: requestedRetailers,
+            forceRefresh: forceRefresh,
+          );
+          if (_isDisposed || searchToken != _searchSeq) return const [];
+          if (_repository.liveNetworkRequestsMade > beforeCalls) {
+            _recordLiveNetworkSearch();
+          }
+          if (remote.isNotEmpty) {
+            _products = _mergeProductLists(remote, _products);
+            _isLiveCatalogActive = true;
+            _lastSyncedAt = DateTime.now();
+            _lastSyncedPincode = requestedPin;
+          }
+          if (_repository.lastCreditsRemaining != null) {
+            _creditsRemaining = _repository.lastCreditsRemaining;
+          }
+        } on QuickCommerceApiException catch (e) {
+          if (searchToken == _searchSeq) _lastSyncError = e.message;
+        } catch (_) {
+          // Silently keep cached/local search results if remote search fails.
+        } finally {
+          if (searchToken == _searchSeq) _isSearchingRemote = false;
+          if (!_isDisposed) notifyListeners();
         }
-      } catch (_) {
-        // Silently keep cached/local search results if remote search fails.
       }
     }
     return searchProducts(
@@ -823,17 +1167,27 @@ class SastaAppState extends ChangeNotifier {
   }
 
   /// Refreshes latest quotes & price history for a single product when API is active.
-  Future<Product?> refreshProductDetails(String productId) async {
-    if (!isApiConfigured) return productById(productId);
+  Future<Product?> refreshProductDetails(
+    String productId, {
+    bool userInitiated = false,
+  }) async {
+    if (!isApiConfigured ||
+        (!userInitiated &&
+            ((onDemandLiveMode && isQuickCommerceDirect) ||
+                isLiveQuotaExhausted))) {
+      return productById(productId);
+    }
     try {
       final fetched = await _repository.fetchProductDetails(
         productId: productId,
         pincode: activeLocation.pincode,
       );
+      if (_isDisposed) return null;
       final history = await _repository.fetchPriceHistory(
         productId: productId,
         pincode: activeLocation.pincode,
       );
+      if (_isDisposed) return null;
       if (fetched != null || history.isNotEmpty) {
         final base = fetched ?? productById(productId);
         if (base != null) {
@@ -855,9 +1209,12 @@ class SastaAppState extends ChangeNotifier {
   Future<ResolvedPincode?> resolveAndCompletePincode(String rawPincode) async {
     final cleaned = rawPincode.trim();
     final resolved = await _locationService.lookupPincode(cleaned);
+    if (_isDisposed) return resolved;
     completePincode(
       cleaned,
       area: resolved?.displayArea ?? activeLocation.area,
+      lat: resolved?.lat,
+      lng: resolved?.lng,
     );
     return resolved;
   }
@@ -868,16 +1225,26 @@ class SastaAppState extends ChangeNotifier {
     bool finishOnboarding = false,
   }) async {
     final result = await _locationService.detectCurrentLocation();
+    if (_isDisposed) return result;
     final resolved = result.resolved;
     if (resolved != null) {
       if (finishOnboarding) {
-        completePincode(resolved.pincode, area: resolved.displayArea);
+        completePincode(
+          resolved.pincode,
+          area: resolved.displayArea,
+          lat: resolved.lat,
+          lng: resolved.lng,
+        );
       } else {
         final existingIdx =
             _locations.indexWhere((l) => l.pincode == resolved.pincode);
         if (existingIdx != -1) {
           updateLocation(
-            _locations[existingIdx].copyWith(area: resolved.displayArea),
+            _locations[existingIdx].copyWith(
+              area: resolved.displayArea,
+              lat: resolved.lat,
+              lng: resolved.lng,
+            ),
           );
           setDefaultLocation(_locations[existingIdx].id);
         } else {
@@ -885,6 +1252,8 @@ class SastaAppState extends ChangeNotifier {
             label: 'GPS',
             pincode: resolved.pincode,
             area: resolved.displayArea,
+            lat: resolved.lat,
+            lng: resolved.lng,
             makeDefault: true,
           );
         }
@@ -910,33 +1279,82 @@ class SastaAppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void completePincode(String pincode, {String area = 'Central Delhi'}) {
+  bool _onActiveLocationChanged(String previousPin) {
+    final currentPin = activeLocation.pincode;
+    if (currentPin == previousPin) return false;
+    ++_syncSeq;
+    ++_searchSeq;
+    _isCatalogSyncing = false;
+    _isSearchingRemote = false;
+    _lastSyncError = null;
+    _lastSyncedAt = null;
+    _lastSyncedPincode = null;
+    _lastSyncedRetailers = const {};
+    _serviceableRetailers = const [];
+    _retailerEtas.clear();
+    final pinPrefix = 'qc_${currentPin}_';
+    _products = _products
+        .where((p) => !p.isLiveProduct || p.id.startsWith(pinPrefix))
+        .toList();
+    _isLiveCatalogActive =
+        _products.any((p) => p.id.startsWith(pinPrefix));
+    return true;
+  }
+
+  bool get _shouldAutoSyncForLocation =>
+      isApiConfigured &&
+      (!onDemandLiveMode || hasFreshCacheFor(query: 'milk', isHomeQuery: true));
+
+  void completePincode(
+    String pincode, {
+    String area = 'Central Delhi',
+    double? lat,
+    double? lng,
+  }) {
     final cleaned = pincode.trim();
+    final previousPin = activeLocation.pincode;
     if (cleaned.length == 6) {
+      final fallback = (lat == null || lng == null)
+          ? PincodeLocationService.fallbackCoordinatesSync(cleaned)
+          : null;
+      final resolvedLat = lat ?? fallback?.lat;
+      final resolvedLng = lng ?? fallback?.lng;
       final idx = _locations.indexWhere((l) => l.pincode == cleaned);
       if (idx != -1) {
-        setDefaultLocation(_locations[idx].id);
+        _locations[idx] = _locations[idx].copyWith(
+          area: area,
+          lat: resolvedLat ?? _locations[idx].lat,
+          lng: resolvedLng ?? _locations[idx].lng,
+        );
+        for (var i = 0; i < _locations.length; i++) {
+          _locations[i] = _locations[i].copyWith(isDefault: i == idx);
+        }
       } else {
         for (var i = 0; i < _locations.length; i++) {
           _locations[i] = _locations[i].copyWith(isDefault: false);
         }
+        final hasHome =
+            _locations.any((l) => l.label.toLowerCase() == 'home');
         _locations.insert(
           0,
           SavedLocation(
             id: 'loc_${DateTime.now().millisecondsSinceEpoch}',
-            label: 'Home',
+            label: hasHome ? 'Saved place' : 'Home',
             pincode: cleaned,
             area: area,
+            lat: resolvedLat,
+            lng: resolvedLng,
             isDefault: true,
           ),
         );
       }
     }
+    _onActiveLocationChanged(previousPin);
     _hasSeenOnboarding = true;
     _hasSetPincode = true;
     _isLoggedOut = false;
     notifyListeners();
-    if (isApiConfigured) {
+    if (_shouldAutoSyncForLocation) {
       unawaited(syncCatalogForLocation());
     }
   }
@@ -968,11 +1386,14 @@ class SastaAppState extends ChangeNotifier {
   }
 
   void setDefaultLocation(String id) {
+    final prevPin = activeLocation.pincode;
     for (var i = 0; i < _locations.length; i++) {
       _locations[i] = _locations[i].copyWith(isDefault: _locations[i].id == id);
     }
+    final changed = _onActiveLocationChanged(prevPin);
     notifyListeners();
-    if (isApiConfigured) {
+    if ((changed || _lastSyncedPincode != activeLocation.pincode) &&
+        _shouldAutoSyncForLocation) {
       unawaited(syncCatalogForLocation());
     }
   }
@@ -981,44 +1402,91 @@ class SastaAppState extends ChangeNotifier {
     required String label,
     required String pincode,
     required String area,
+    double? lat,
+    double? lng,
     bool makeDefault = false,
   }) {
+    final prevPin = activeLocation.pincode;
     if (makeDefault) {
       for (var i = 0; i < _locations.length; i++) {
         _locations[i] = _locations[i].copyWith(isDefault: false);
       }
     }
+    final fallback = (lat == null || lng == null)
+        ? PincodeLocationService.fallbackCoordinatesSync(pincode)
+        : null;
     _locations.add(
       SavedLocation(
         id: 'loc_${DateTime.now().millisecondsSinceEpoch}',
         label: label,
         pincode: pincode,
         area: area,
+        lat: lat ?? fallback?.lat,
+        lng: lng ?? fallback?.lng,
         isDefault: makeDefault || _locations.isEmpty,
       ),
     );
+    _onActiveLocationChanged(prevPin);
     notifyListeners();
-    if (makeDefault && isApiConfigured) {
+    if (makeDefault && _shouldAutoSyncForLocation) {
       unawaited(syncCatalogForLocation());
     }
   }
 
   void updateLocation(SavedLocation updated) {
     final idx = _locations.indexWhere((l) => l.id == updated.id);
-    if (idx != -1) {
-      _locations[idx] = updated;
-      notifyListeners();
+    if (idx == -1) return;
+    final prevPin = activeLocation.pincode;
+    final existing = _locations[idx];
+    var normalized = updated;
+    if (updated.pincode != existing.pincode &&
+        updated.lat == existing.lat &&
+        updated.lng == existing.lng) {
+      final fallback =
+          PincodeLocationService.fallbackCoordinatesSync(updated.pincode);
+      normalized = SavedLocation(
+        id: updated.id,
+        label: updated.label,
+        pincode: updated.pincode,
+        area: updated.area,
+        lat: fallback?.lat,
+        lng: fallback?.lng,
+        isDefault: updated.isDefault,
+      );
+    }
+    if (normalized.isDefault) {
+      for (var i = 0; i < _locations.length; i++) {
+        if (i != idx) {
+          _locations[i] = _locations[i].copyWith(isDefault: false);
+        }
+      }
+    }
+    _locations[idx] = normalized;
+    if (!_locations.any((l) => l.isDefault) && _locations.isNotEmpty) {
+      final fallbackIdx = _locations.length > 1 && idx == 0 ? 1 : 0;
+      _locations[fallbackIdx] =
+          _locations[fallbackIdx].copyWith(isDefault: true);
+    }
+    final changed = _onActiveLocationChanged(prevPin);
+    notifyListeners();
+    if (changed && _shouldAutoSyncForLocation) {
+      unawaited(syncCatalogForLocation());
     }
   }
 
   void deleteLocation(String id) {
     if (_locations.length <= 1) return;
+    final prevPin = activeLocation.pincode;
     final wasDefault = _locations.any((l) => l.id == id && l.isDefault);
     _locations.removeWhere((l) => l.id == id);
     if (wasDefault && _locations.isNotEmpty) {
       _locations[0] = _locations[0].copyWith(isDefault: true);
     }
+    final changed = _onActiveLocationChanged(prevPin);
     notifyListeners();
+    if (changed && _shouldAutoSyncForLocation) {
+      unawaited(syncCatalogForLocation());
+    }
   }
 
   bool isFavourite(String productId) => _favouriteIds.contains(productId);
@@ -1057,6 +1525,7 @@ class SastaAppState extends ChangeNotifier {
         isToday: true,
         artKind: match.isNotEmpty ? match.first.artKind : ProductArtKind.milk,
         pastel: match.isNotEmpty ? match.first.pastel : SastaPastel.lavender,
+        imageUrl: match.isNotEmpty ? match.first.bestImageUrl : null,
       ),
     );
     notifyListeners();
@@ -1125,13 +1594,14 @@ class SastaAppState extends ChangeNotifier {
   }
 
   int quantityInActiveBasket(String productId, {int? variantIndex}) {
+    var total = 0;
     for (final e in activeBasket.entries) {
       if (e.productId == productId &&
           (variantIndex == null || e.variantIndex == variantIndex)) {
-        return e.quantity;
+        total += e.quantity;
       }
     }
-    return 0;
+    return total;
   }
 
   void addToBasket(
@@ -1146,10 +1616,16 @@ class SastaAppState extends ChangeNotifier {
     final basket = _savedBaskets[bIdx];
     final product = productById(productId);
     if (product == null) return;
-    final resolvedVariant = variantIndex ?? product.defaultVariantIndex;
+    final resolvedVariant = (variantIndex ?? product.defaultVariantIndex)
+        .clamp(0, product.variants.length - 1);
 
     final entries = List<BasketEntry>.from(basket.entries);
-    final eIdx = entries.indexWhere((e) => e.productId == productId);
+    var eIdx = entries.indexWhere(
+      (e) => e.productId == productId && e.variantIndex == resolvedVariant,
+    );
+    if (eIdx == -1 && variantIndex == null && delta < 0) {
+      eIdx = entries.indexWhere((e) => e.productId == productId);
+    }
     if (eIdx != -1) {
       final current = entries[eIdx];
       final nextQty = current.quantity + delta;
@@ -1162,13 +1638,10 @@ class SastaAppState extends ChangeNotifier {
           productId: productId,
         );
       } else {
-        entries[eIdx] = current.copyWith(
-          variantIndex: variantIndex ?? current.variantIndex,
-          quantity: nextQty,
-        );
-        if (delta > 0 && current.quantity == 1 && nextQty == 2) {
+        entries[eIdx] = current.copyWith(quantity: nextQty);
+        if (delta != 0) {
           _pushBasketActivity(
-            '${product.name} quantity 1 → 2',
+            '${product.name} quantity ${current.quantity} → $nextQty',
             'Just now',
             'qty',
             productId: productId,
@@ -1198,12 +1671,20 @@ class SastaAppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void updateBasketItemQuantity(String productId, int newQuantity) {
+  void updateBasketItemQuantity(
+    String productId,
+    int newQuantity, {
+    int? variantIndex,
+  }) {
     final bIdx = _savedBaskets.indexWhere((b) => b.id == _activeBasketId);
     if (bIdx == -1) return;
     final basket = _savedBaskets[bIdx];
     final entries = List<BasketEntry>.from(basket.entries);
-    final eIdx = entries.indexWhere((e) => e.productId == productId);
+    final eIdx = entries.indexWhere(
+      (e) =>
+          e.productId == productId &&
+          (variantIndex == null || e.variantIndex == variantIndex),
+    );
     if (eIdx == -1) return;
 
     final product = productById(productId);
@@ -1220,7 +1701,7 @@ class SastaAppState extends ChangeNotifier {
     } else {
       final old = entries[eIdx].quantity;
       entries[eIdx] = entries[eIdx].copyWith(quantity: newQuantity);
-      if (product != null) {
+      if (product != null && old != newQuantity) {
         _pushBasketActivity(
           '${product.name} quantity $old → $newQuantity',
           'Just now',
@@ -1249,10 +1730,30 @@ class SastaAppState extends ChangeNotifier {
   void removeBasketItems(Set<String> productIds) {
     final bIdx = _savedBaskets.indexWhere((b) => b.id == _activeBasketId);
     if (bIdx == -1) return;
+    final removedIds = _savedBaskets[bIdx]
+        .entries
+        .where((e) => productIds.contains(e.productId))
+        .map((e) => e.productId)
+        .toSet();
     final entries = _savedBaskets[bIdx]
         .entries
         .where((e) => !productIds.contains(e.productId))
         .toList();
+    if (removedIds.length == 1) {
+      final name = productById(removedIds.first)?.name ?? 'item';
+      _pushBasketActivity(
+        'Removed $name',
+        'Just now',
+        'removed',
+        productId: removedIds.first,
+      );
+    } else if (removedIds.length > 1) {
+      _pushBasketActivity(
+        'Removed ${removedIds.length} items',
+        'Just now',
+        'removed',
+      );
+    }
     _savedBaskets[bIdx] = _savedBaskets[bIdx].copyWith(
       entries: entries,
       updatedLabel: 'Edited just now',
@@ -1355,20 +1856,25 @@ class SastaAppState extends ChangeNotifier {
     int? maxPrice,
     String? sortBy,
   }) {
+    final activeRetailers =
+        retailerFilter != null ? {retailerFilter} : _enabledRetailers;
     final q = query.trim().toLowerCase();
+    final tokens =
+        q.split(RegExp(r'\s+')).where((t) => t.isNotEmpty).toList();
     final filtered = _products.where((p) {
       if (categoryId != null && categoryId.isNotEmpty && p.categoryId != categoryId) {
         return false;
       }
-      if (q.isNotEmpty) {
+      if (tokens.isNotEmpty) {
+        final variantLabels = p.variants.map((v) => v.label).join(' ');
         final haystack =
-            '${p.name} ${p.brand} ${p.categoryLabel} ${p.subtitle}'.toLowerCase();
-        if (!haystack.contains(q)) return false;
+            '${p.name} ${p.brand} ${p.categoryLabel} ${p.subtitle} $variantLabels'
+                .toLowerCase();
+        if (!tokens.every(haystack.contains)) return false;
       }
       final cheapest = p.cheapestQuote(
         p.defaultVariantIndex,
-        enabledRetailers:
-            retailerFilter != null ? {retailerFilter} : _enabledRetailers,
+        enabledRetailers: activeRetailers,
       );
       if (inStockOnly && cheapest == null) return false;
       if (maxPrice != null && (cheapest?.price ?? 999999) > maxPrice) {
@@ -1377,20 +1883,115 @@ class SastaAppState extends ChangeNotifier {
       return true;
     }).toList();
 
+    double bestUnitRate(Product p) {
+      final quotes = p
+          .sortedQuotes(p.defaultVariantIndex, enabledRetailers: activeRetailers)
+          .where((quote) => quote.isAvailable)
+          .toList();
+      if (quotes.isEmpty) return 999999;
+      double best = double.infinity;
+      for (final quote in quotes) {
+        final rate = quote.parsedUnitRate ?? quote.price?.toDouble();
+        if (rate != null && rate < best) best = rate;
+      }
+      return best.isFinite ? best : 999999;
+    }
+
     final resolvedSort = sortBy ?? _defaultSort;
     if (resolvedSort == 'Lowest price') {
       filtered.sort((a, b) {
-        final ap = a.cheapestQuote(a.defaultVariantIndex)?.price ?? 999999;
-        final bp = b.cheapestQuote(b.defaultVariantIndex)?.price ?? 999999;
-        return ap.compareTo(bp);
+        final ap = a
+                .cheapestQuote(
+                  a.defaultVariantIndex,
+                  enabledRetailers: activeRetailers,
+                )
+                ?.price ??
+            999999;
+        final bp = b
+                .cheapestQuote(
+                  b.defaultVariantIndex,
+                  enabledRetailers: activeRetailers,
+                )
+                ?.price ??
+            999999;
+        final cmp = ap.compareTo(bp);
+        if (cmp != 0) return cmp;
+        if (a.isLiveProduct != b.isLiveProduct) {
+          return a.isLiveProduct ? -1 : 1;
+        }
+        return 0;
       });
     } else if (resolvedSort == 'Discount') {
       filtered.sort((a, b) {
-        final ad =
-            a.cheapestQuote(a.defaultVariantIndex)?.discountPercent ?? 0;
-        final bd =
-            b.cheapestQuote(b.defaultVariantIndex)?.discountPercent ?? 0;
-        return bd.compareTo(ad);
+        final ad = a
+                .cheapestQuote(
+                  a.defaultVariantIndex,
+                  enabledRetailers: activeRetailers,
+                )
+                ?.discountPercent ??
+            0;
+        final bd = b
+                .cheapestQuote(
+                  b.defaultVariantIndex,
+                  enabledRetailers: activeRetailers,
+                )
+                ?.discountPercent ??
+            0;
+        final cmp = bd.compareTo(ad);
+        if (cmp != 0) return cmp;
+        if (a.isLiveProduct != b.isLiveProduct) {
+          return a.isLiveProduct ? -1 : 1;
+        }
+        return 0;
+      });
+    } else if (resolvedSort == 'Best unit price') {
+      filtered.sort((a, b) {
+        final cmp = bestUnitRate(a).compareTo(bestUnitRate(b));
+        if (cmp != 0) return cmp;
+        if (a.isLiveProduct != b.isLiveProduct) {
+          return a.isLiveProduct ? -1 : 1;
+        }
+        return 0;
+      });
+    } else if (resolvedSort == 'Availability') {
+      filtered.sort((a, b) {
+        final ac = a.availableAppCount(
+          a.defaultVariantIndex,
+          enabledRetailers: activeRetailers,
+        );
+        final bc = b.availableAppCount(
+          b.defaultVariantIndex,
+          enabledRetailers: activeRetailers,
+        );
+        final cmp = bc.compareTo(ac);
+        if (cmp != 0) return cmp;
+        final ap = a
+                .cheapestQuote(
+                  a.defaultVariantIndex,
+                  enabledRetailers: activeRetailers,
+                )
+                ?.price ??
+            999999;
+        final bp = b
+                .cheapestQuote(
+                  b.defaultVariantIndex,
+                  enabledRetailers: activeRetailers,
+                )
+                ?.price ??
+            999999;
+        final pCmp = ap.compareTo(bp);
+        if (pCmp != 0) return pCmp;
+        if (a.isLiveProduct != b.isLiveProduct) {
+          return a.isLiveProduct ? -1 : 1;
+        }
+        return 0;
+      });
+    } else {
+      filtered.sort((a, b) {
+        if (a.isLiveProduct != b.isLiveProduct) {
+          return a.isLiveProduct ? -1 : 1;
+        }
+        return 0;
       });
     }
     return filtered;
@@ -1400,7 +2001,9 @@ class SastaAppState extends ChangeNotifier {
   BasketComparisonResult computeBasketComparison({
     List<BasketEntry>? customEntries,
   }) {
-    final entries = customEntries ?? activeBasket.entries;
+    final rawEntries = customEntries ?? activeBasket.entries;
+    final entries =
+        rawEntries.where((e) => productById(e.productId) != null).toList();
     final activeRetailers =
         _enabledRetailers.isEmpty ? RetailerId.values.toSet() : _enabledRetailers;
 
@@ -1530,9 +2133,15 @@ class SastaAppState extends ChangeNotifier {
     required String email,
     required String phone,
   }) {
-    _fullName = name.trim().isEmpty ? 'Your name' : name.trim();
-    _email = email.trim().isEmpty ? 'you@example.com' : email.trim();
-    _phone = phone.trim().isEmpty ? _phone : phone.trim();
+    final cleanName = name.trim();
+    final cleanEmail = email.trim();
+    final cleanPhone = phone.trim();
+    _fullName = cleanName.isEmpty ? 'Your name' : cleanName;
+    _email = cleanEmail.isEmpty ? 'you@example.com' : cleanEmail;
+    if (cleanPhone.isNotEmpty && cleanPhone != _phone) {
+      _phone = cleanPhone;
+      _phoneVerified = false;
+    }
     notifyListeners();
   }
 
@@ -1615,19 +2224,43 @@ class SastaAppState extends ChangeNotifier {
   }
 
   // Sasta+ subscription
-  void subscribeToPlan(SastaPlanType plan) {
+  void subscribeToPlan(
+    SastaPlanType plan, {
+    String paymentMethod = 'UPI',
+  }) {
+    if (plan == SastaPlanType.free) return;
     _planType = plan;
     _autoRenew = true;
     final amount = plan == SastaPlanType.yearly ? 399 : 49;
     final name =
         plan == SastaPlanType.yearly ? 'Sasta+ Yearly' : 'Sasta+ Monthly';
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    final now = DateTime.now();
+    final dateLabel = '${now.day} ${months[now.month - 1]} ${now.year}';
+    final suffix = ((now.millisecondsSinceEpoch % 9000) + 1000).toString();
+    final prefix = paymentMethod.trim().isEmpty
+        ? 'UPI'
+        : paymentMethod.trim().split(' ').first.toUpperCase();
     _invoices.insert(
       0,
       SubscriptionInvoice(
-        id: 'inv_${DateTime.now().millisecondsSinceEpoch}',
+        id: 'inv_${now.millisecondsSinceEpoch}',
         planName: name,
-        dateLabel: '8 Nov 2026',
-        txnCode: 'TXN-••9104',
+        dateLabel: dateLabel,
+        txnCode: '$prefix-••$suffix',
         amount: amount,
         status: 'Paid',
       ),
@@ -1669,8 +2302,89 @@ class SastaAppState extends ChangeNotifier {
     _isLoggedOut = true;
     _hasSeenOnboarding = false;
     _hasSetPincode = false;
+    _hasCompletedSplash = false;
     _activeTabIndex = 0;
     notifyListeners();
+  }
+
+  Future<void> deleteAccount() async {
+    _saveTimer?.cancel();
+    _saveTimer = null;
+    ++_syncSeq;
+    ++_searchSeq;
+    _fullName = 'Your name';
+    _email = 'you@example.com';
+    _phone = '+91 98765 43210';
+    _phoneVerified = false;
+    _avatarStyleIndex = 0;
+    _themeMode = ThemeMode.light;
+    _planType = SastaPlanType.free;
+    _autoRenew = true;
+    _invoices.clear();
+    _favouriteIds.clear();
+    _priceAlerts.clear();
+    _searchHistory.clear();
+    _supportTickets.clear();
+    _notifications.clear();
+    _recentlyViewedIds.clear();
+    _savedBaskets
+      ..clear()
+      ..add(
+        const SavedBasket(
+          id: 'b_default',
+          name: 'My Basket',
+          updatedLabel: 'Empty',
+          pastel: SastaPastel.sky,
+          entries: [],
+        ),
+      );
+    _activeBasketId = 'b_default';
+    _basketActivities.clear();
+    _locations
+      ..clear()
+      ..add(
+        const SavedLocation(
+          id: 'loc_1',
+          label: 'Home',
+          pincode: '110001',
+          area: 'Central Delhi',
+          isDefault: true,
+        ),
+      );
+    _products = List<Product>.from(MockCatalog.products);
+    _isLiveCatalogActive = false;
+    _isCatalogSyncing = false;
+    _isSearchingRemote = false;
+    _lastSyncedAt = null;
+    _lastSyncedPincode = null;
+    _lastSyncedRetailers = const {};
+    _lastSyncError = null;
+    _creditsRemaining = null;
+    _serviceableRetailers = const [];
+    _retailerEtas.clear();
+    _dailyLiveSearchDate = '';
+    _dailyLiveSearchesUsed = 0;
+    _onDemandLiveModeOverride = null;
+    if (!_hasCustomRepo) {
+      _apiBaseUrl = _defaultApiConfig?.baseUrl ?? '';
+      _apiKey = _defaultApiConfig?.apiKey ?? '';
+      _repository.dispose();
+      _repository = HttpQuickCommerceRepository(
+        config: QuickCommerceApiConfig(
+          baseUrl: _apiBaseUrl,
+          apiKey: _apiKey,
+        ),
+      );
+    }
+    _isLoggedOut = true;
+    _hasSeenOnboarding = false;
+    _hasSetPincode = false;
+    _hasCompletedSplash = false;
+    _activeTabIndex = 0;
+    if (!_isDisposed) {
+      super.notifyListeners();
+    }
+    await _storage?.clearAll();
   }
 
   @override
@@ -1684,6 +2398,9 @@ class SastaAppState extends ChangeNotifier {
   void dispose() {
     _isDisposed = true;
     _saveTimer?.cancel();
+    if (!_hasCustomRepo) {
+      _repository.dispose();
+    }
     if (_ownsLocationService) {
       _locationService.dispose();
     }

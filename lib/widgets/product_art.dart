@@ -6,18 +6,20 @@ import '../models/models.dart';
 import '../theme/sasta_tokens.dart';
 import 'sasta_mascot.dart';
 
-/// Crisp pastel-framed flat-vector product illustration (zero emoji).
+/// Crisp pastel-framed flat-vector product illustration (or real live packshot).
 class ProductArtTile extends StatelessWidget {
   const ProductArtTile({
     super.key,
     required this.kind,
     required this.pastel,
+    this.imageUrl,
     this.size = 56,
     this.borderRadius,
   });
 
   final ProductArtKind kind;
   final SastaPastel pastel;
+  final String? imageUrl;
   final double size;
   final double? borderRadius;
 
@@ -25,6 +27,13 @@ class ProductArtTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final bg = context.sasta.pastel(pastel);
     final radius = borderRadius ?? (size * 0.32);
+    final url = imageUrl?.trim();
+    final fallback = ClipRect(
+      child: CustomPaint(
+        size: Size.square(size * 0.68),
+        painter: ProductArtPainter(kind: kind),
+      ),
+    );
     return Container(
       width: size,
       height: size,
@@ -34,12 +43,25 @@ class ProductArtTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(radius),
       ),
       alignment: Alignment.center,
-      child: ClipRect(
-        child: CustomPaint(
-          size: Size.square(size * 0.68),
-          painter: ProductArtPainter(kind: kind),
-        ),
-      ),
+      child: (url != null && url.isNotEmpty)
+          ? Container(
+              width: size,
+              height: size,
+              color: Colors.white,
+              padding: EdgeInsets.all(math.max(2, size * 0.08)),
+              child: Image.network(
+                url,
+                fit: BoxFit.contain,
+                errorBuilder: (_, _, _) => Center(
+                  child: Container(
+                    color: bg,
+                    alignment: Alignment.center,
+                    child: fallback,
+                  ),
+                ),
+              ),
+            )
+          : fallback,
     );
   }
 }
@@ -753,7 +775,7 @@ class SplashHeroArtwork extends StatelessWidget {
           const Positioned(
             bottom: 12,
             left: 84,
-            child: SastaSparkle(size: 14, color: Colors.white),
+            child: SastaSparkle(size: 14, color: SastaColors.gold),
           ),
         ],
       ),

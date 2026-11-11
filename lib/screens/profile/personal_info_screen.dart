@@ -42,8 +42,26 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final state = SastaScope.read(context);
+    final state = SastaScope.of(context);
     final palette = context.sasta;
+    final avatarColor = switch (state.avatarStyleIndex % 4) {
+      1 => SastaColors.zepto,
+      2 => SastaColors.blinkit,
+      3 => SastaColors.instamart,
+      _ => SastaColors.flipkartMinutes,
+    };
+    final avatarExpression = switch (state.avatarStyleIndex % 4) {
+      1 => MascotExpression.happy,
+      2 => MascotExpression.calm,
+      3 => MascotExpression.joy,
+      _ => MascotExpression.joy,
+    };
+    final avatarHalo = switch (state.avatarStyleIndex % 4) {
+      1 => palette.lavender,
+      2 => palette.butter,
+      3 => palette.peach,
+      _ => palette.sky,
+    };
 
     return Scaffold(
       body: SastaBackground(
@@ -62,37 +80,47 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                 const SastaHeaderBar(title: 'Personal information'),
                 const SizedBox(height: 18),
                 Center(
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      SastaMascot(
-                        size: 98,
-                        color: SastaColors.flipkartMinutes,
-                        expression: MascotExpression.joy,
-                        haloColor: palette.sky,
-                      ),
-                      Positioned(
-                        right: 0,
-                        bottom: 0,
-                        child: Container(
-                          width: 34,
-                          height: 34,
-                          decoration: BoxDecoration(
-                            color: palette.primaryCtaBg,
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: palette.screen,
-                              width: 2.5,
+                  child: Semantics(
+                    button: true,
+                    label: 'Change avatar style',
+                    child: GestureDetector(
+                      onTap: () {
+                        state.cycleAvatarStyle();
+                        showSastaToast(context, 'Avatar style updated');
+                      },
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          SastaMascot(
+                            size: 98,
+                            color: avatarColor,
+                            expression: avatarExpression,
+                            haloColor: avatarHalo,
+                          ),
+                          Positioned(
+                            right: 0,
+                            bottom: 0,
+                            child: Container(
+                              width: 34,
+                              height: 34,
+                              decoration: BoxDecoration(
+                                color: palette.primaryCtaBg,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: palette.screen,
+                                  width: 2.5,
+                                ),
+                              ),
+                              child: Icon(
+                                Icons.edit_rounded,
+                                size: 16,
+                                color: palette.primaryCtaFg,
+                              ),
                             ),
                           ),
-                          child: Icon(
-                            Icons.edit_rounded,
-                            size: 16,
-                            color: palette.primaryCtaFg,
-                          ),
-                        ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
                 const SizedBox(height: 22),
@@ -168,10 +196,29 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                 SastaPrimaryButton(
                   label: 'Save changes',
                   onPressed: () {
+                    final name = _nameCtrl.text.trim();
+                    final email = _emailCtrl.text.trim();
+                    final phone = _phoneCtrl.text.trim();
+                    if (name.isEmpty) {
+                      showSastaToast(context, 'Enter your name');
+                      return;
+                    }
+                    if (email.isNotEmpty &&
+                        !RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
+                            .hasMatch(email)) {
+                      showSastaToast(context, 'Enter a valid email address');
+                      return;
+                    }
+                    final phoneDigits =
+                        phone.replaceAll(RegExp(r'[^0-9]'), '');
+                    if (phone.isNotEmpty && phoneDigits.length < 10) {
+                      showSastaToast(context, 'Enter a valid mobile number');
+                      return;
+                    }
                     state.updateProfile(
-                      name: _nameCtrl.text,
-                      email: _emailCtrl.text,
-                      phone: _phoneCtrl.text,
+                      name: name,
+                      email: email,
+                      phone: phone,
                     );
                     Navigator.of(context).pop();
                     showSastaToast(context, 'Profile updated');

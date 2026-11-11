@@ -13,9 +13,14 @@ import '../../widgets/sasta_mascot.dart';
 import '../../widgets/sasta_motion.dart';
 
 class PaySuccessScreen extends StatefulWidget {
-  const PaySuccessScreen({super.key, this.planType = SastaPlanType.yearly});
+  const PaySuccessScreen({
+    super.key,
+    this.planType = SastaPlanType.yearly,
+    this.paymentMethod = 'UPI',
+  });
 
   final SastaPlanType planType;
+  final String paymentMethod;
 
   @override
   State<PaySuccessScreen> createState() => _PaySuccessScreenState();
@@ -31,7 +36,18 @@ class _PaySuccessScreenState extends State<PaySuccessScreen>
     _confettiCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 2400),
-    )..repeat();
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final disabled = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    if (disabled && _confettiCtrl.isAnimating) {
+      _confettiCtrl.stop();
+    } else if (!disabled && !_confettiCtrl.isAnimating) {
+      _confettiCtrl.repeat();
+    }
   }
 
   @override
@@ -134,6 +150,11 @@ class _PaySuccessScreenState extends State<PaySuccessScreen>
                                   _InfoRow(
                                     label: 'Next renewal',
                                     value: nextRenewal,
+                                  ),
+                                  const SizedBox(height: 10),
+                                  _InfoRow(
+                                    label: 'Payment method',
+                                    value: widget.paymentMethod,
                                   ),
                                 ],
                               ),

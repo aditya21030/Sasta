@@ -47,13 +47,32 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   void _next() {
     if (_pageIndex < _slides.length - 1) {
-      _pageController.animateToPage(
-        _pageIndex + 1,
-        duration: const Duration(milliseconds: 350),
-        curve: SastaMotion.curve,
-      );
+      final disabled = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+      if (disabled) {
+        _pageController.jumpToPage(_pageIndex + 1);
+      } else {
+        _pageController.animateToPage(
+          _pageIndex + 1,
+          duration: const Duration(milliseconds: 350),
+          curve: SastaMotion.curve,
+        );
+      }
     } else {
       SastaScope.read(context).completeOnboarding();
+    }
+  }
+
+  void _previous() {
+    if (_pageIndex <= 0) return;
+    final disabled = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    if (disabled) {
+      _pageController.jumpToPage(_pageIndex - 1);
+    } else {
+      _pageController.animateToPage(
+        _pageIndex - 1,
+        duration: const Duration(milliseconds: 300),
+        curve: SastaMotion.curve,
+      );
     }
   }
 
@@ -64,7 +83,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     final palette = context.sasta;
-    return Scaffold(
+    return PopScope(
+      canPop: _pageIndex == 0,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && _pageIndex > 0) {
+          _previous();
+        }
+      },
+      child: Scaffold(
       body: SastaBackground(
         child: SafeArea(
           child: Padding(
@@ -167,6 +193,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ),
         ),
       ),
+      ),
     );
   }
 }
@@ -217,7 +244,7 @@ class _OnboardingOrb extends StatelessWidget {
               top: 32,
               child: _OrbitRetailerBadge(
                 retailer: RetailerId.zepto,
-                price: '₹27',
+                price: '₹26',
               ),
             ),
             const Positioned(
@@ -225,7 +252,7 @@ class _OnboardingOrb extends StatelessWidget {
               top: 28,
               child: _OrbitRetailerBadge(
                 retailer: RetailerId.instamart,
-                price: '₹26',
+                price: '₹25',
               ),
             ),
             const Positioned(
@@ -233,7 +260,7 @@ class _OnboardingOrb extends StatelessWidget {
               bottom: 34,
               child: _OrbitRetailerBadge(
                 retailer: RetailerId.flipkartMinutes,
-                price: '₹29',
+                price: '₹26',
               ),
             ),
             const Positioned(
@@ -241,7 +268,7 @@ class _OnboardingOrb extends StatelessWidget {
               bottom: 38,
               child: _OrbitRetailerBadge(
                 retailer: RetailerId.blinkit,
-                price: '₹28',
+                price: '₹27',
               ),
             ),
             const Positioned(

@@ -1,0 +1,12 @@
+name = "sasta-cache-proxy"
+main = "worker.js"
+compatibility_date = "2026-01-01"
+
+[vars]
+UPSTREAM_BASE_URL = "https://api.quickcommerceapi.com"
+MAX_DAILY_CREDITS = "200"
+MAX_MISSES_PER_IP_PER_HOUR = "20"
+
+# Set secrets via CLI before deploying (never commit secrets here):
+#   npx wrangler secret put QUICKCOMMERCE_API_KEY
+#   npx wrangler secret put CLIENT_APP_TOKEN   (optional)

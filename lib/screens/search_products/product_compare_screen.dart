@@ -23,12 +23,16 @@ class ProductCompareScreen extends StatelessWidget {
     final product =
         state.productById(args?.productId ?? 'amul_milk') ??
             state.products.first;
-    final vIdx = args?.variantIndex ?? product.defaultVariantIndex;
+    final rawVariant = args?.variantIndex ?? product.defaultVariantIndex;
+    final vIdx = rawVariant.clamp(0, product.variants.length - 1);
     final variant = product.variantAt(vIdx);
-    final quotes = product.sortedQuotes(
+    final allQuotes = product.sortedQuotes(
       vIdx,
       enabledRetailers: state.enabledRetailers,
     );
+    final quotes = state.includeUnavailable
+        ? allQuotes
+        : allQuotes.where((q) => q.isAvailable).toList();
     final cheapest = product.cheapestQuote(
       vIdx,
       enabledRetailers: state.enabledRetailers,
@@ -120,6 +124,7 @@ class ProductCompareScreen extends StatelessWidget {
                                     ProductArtTile(
                                       kind: product.artKind,
                                       pastel: product.pastel,
+                                      imageUrl: product.bestImageUrl,
                                       size: 72,
                                     ),
                                     const Positioned(
@@ -145,14 +150,23 @@ class ProductCompareScreen extends StatelessWidget {
                             children: [
                               Flexible(
                                 child: SastaTag(
-                                  label: 'Cheapest right now',
-                                  backgroundColor: palette.mint,
-                                  textColor: palette.successText,
+                                  label: cheapest.stockStatus ==
+                                          StockStatus.lowStock
+                                      ? 'Cheapest · only ${cheapest.lowStockCount ?? 2} left'
+                                      : 'Cheapest right now',
+                                  backgroundColor: cheapest.stockStatus ==
+                                          StockStatus.lowStock
+                                      ? palette.peach
+                                      : palette.mint,
+                                  textColor: cheapest.stockStatus ==
+                                          StockStatus.lowStock
+                                      ? palette.warningText
+                                      : palette.successText,
                                 ),
                               ),
                               const SizedBox(width: 8),
                               Text(
-                                cheapest.retailer.eta,
+                                cheapest.sla ?? state.etaFor(cheapest.retailer),
                                 style: SastaText.muted(context, size: 12),
                               ),
                             ],
@@ -169,6 +183,9 @@ class ProductCompareScreen extends StatelessWidget {
                               itemLabel:
                                   '${product.name} (${cheapest.packLabel})',
                               searchQuery: product.name,
+                              productUrl: cheapest.productUrl,
+                              etaOverride:
+                                  cheapest.sla ?? state.etaFor(cheapest.retailer),
                             ),
                             borderRadius: BorderRadius.circular(24),
                             child: Padding(
@@ -221,9 +238,19 @@ class ProductCompareScreen extends StatelessWidget {
                         ),
                       ],
                       Divider(height: 26, color: palette.divider),
-                      for (final q in quotes.where((q) => q != cheapest))
+                      if (quotes.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          child: Text(
+                            'All enabled retailers are currently out of stock for ${variant.label}.',
+                            style: SastaText.muted(context, size: 13),
+                          ),
+                        )
+                      else
+                        for (final q in quotes.where((q) => q != cheapest))
                         _RetailerCompareRow(
                           quote: q,
+                          etaText: q.sla ?? state.etaFor(q.retailer),
                           showUnitPrice: state.showUnitPrices,
                           onTap: q.isAvailable
                               ? () => showRetailerHandoffSheet(
@@ -233,6 +260,9 @@ class ProductCompareScreen extends StatelessWidget {
                                     itemLabel:
                                         '${product.name} (${q.packLabel})',
                                     searchQuery: product.name,
+                                    productUrl: q.productUrl,
+                                    etaOverride:
+                                        q.sla ?? state.etaFor(q.retailer),
                                   )
                               : null,
                         ),
@@ -261,6 +291,9 @@ class ProductCompareScreen extends StatelessWidget {
                       estimatedAmount: cheapest.price!,
                       itemLabel: '${product.name} (${cheapest.packLabel})',
                       searchQuery: product.name,
+                      productUrl: cheapest.productUrl,
+                      etaOverride:
+                          cheapest.sla ?? state.etaFor(cheapest.retailer),
                     ),
                   ),
                 ),
@@ -276,11 +309,13 @@ class _RetailerCompareRow extends StatelessWidget {
   const _RetailerCompareRow({
     required this.quote,
     required this.showUnitPrice,
+    this.etaText,
     this.onTap,
   });
 
   final RetailerQuote quote;
   final bool showUnitPrice;
+  final String? etaText;
   final VoidCallback? onTap;
 
   @override
@@ -289,11 +324,16 @@ class _RetailerCompareRow extends StatelessWidget {
     final available = quote.isAvailable;
 
     final statusLine = switch (quote.stockStatus) {
-      StockStatus.inStock => 'In stock',
+      StockStatus.inStock => etaText?.isNotEmpty == true
+          ? 'In stock · $etaText'
+          : 'In stock',
       StockStatus.lowStock =>
         '${quote.packLabel} · only ${quote.lowStockCount ?? 2} left',
       StockStatus.outOfStock => 'Out of stock',
     };
+
+    final hasMrpDiscount =
+        available && quote.mrp != null && quote.mrp! > quote.price!;
 
     return Opacity(
       opacity: available ? 1.0 : 0.58,
@@ -354,13 +394,25 @@ class _RetailerCompareRow extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              Text(
-                available ? '₹${quote.price}' : '—',
-                style: SastaText.display(
-                  context,
-                  size: 22,
-                  color: available ? palette.ink : palette.muted,
-                ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    available ? '₹${quote.price}' : '—',
+                    style: SastaText.display(
+                      context,
+                      size: 22,
+                      color: available ? palette.ink : palette.muted,
+                    ),
+                  ),
+                  if (hasMrpDiscount)
+                    Text(
+                      '₹${quote.mrp}',
+                      style: SastaText.muted(context, size: 11).copyWith(
+                        decoration: TextDecoration.lineThrough,
+                      ),
+                    ),
+                ],
               ),
             ],
           ),

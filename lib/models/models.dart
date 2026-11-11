@@ -72,10 +72,16 @@ enum RetailerId {
         return value;
       }
     }
-    if (normalized == 'swiggy_instamart' || normalized == 'swiggy instamart') {
+    if (normalized == 'swiggy' ||
+        normalized == 'instamart' ||
+        normalized == 'swiggy_instamart' ||
+        normalized == 'swiggy instamart') {
       return RetailerId.instamart;
     }
-    if (normalized == 'flipkart' || normalized == 'minutes') {
+    if (normalized == 'flipkart' ||
+        normalized == 'minutes' ||
+        normalized == 'flipkart_minutes' ||
+        normalized == 'flipkart minutes') {
       return RetailerId.flipkartMinutes;
     }
     return null;
@@ -155,11 +161,15 @@ int _int(Map<String, dynamic> j, String a, [String? b, int fallback = 0]) {
   return _intOrNull(j, a, b) ?? fallback;
 }
 
-double _double(Map<String, dynamic> j, String a, [String? b, double fallback = 0]) {
+double? _doubleOrNull(Map<String, dynamic> j, String a, [String? b]) {
   final v = j[a] ?? (b != null ? j[b] : null);
-  if (v == null) return fallback;
+  if (v == null) return null;
   if (v is num) return v.toDouble();
-  return double.tryParse(v.toString()) ?? fallback;
+  return double.tryParse(v.toString());
+}
+
+double _double(Map<String, dynamic> j, String a, [String? b, double fallback = 0]) {
+  return _doubleOrNull(j, a, b) ?? fallback;
 }
 
 bool _bool(Map<String, dynamic> j, String a, [String? b, bool fallback = false]) {
@@ -237,6 +247,12 @@ class RetailerQuote {
     required this.unitPriceText,
     required this.stockStatus,
     this.lowStockCount,
+    this.productUrl,
+    this.itemId,
+    this.imageUrl,
+    this.sla,
+    this.rating,
+    this.ratingCount,
   });
 
   final RetailerId retailer;
@@ -246,8 +262,20 @@ class RetailerQuote {
   final String unitPriceText;
   final StockStatus stockStatus;
   final int? lowStockCount;
+  final String? productUrl;
+  final String? itemId;
+  final String? imageUrl;
+  final String? sla;
+  final double? rating;
+  final int? ratingCount;
 
   bool get isAvailable => stockStatus != StockStatus.outOfStock && price != null;
+
+  double? get parsedUnitRate {
+    final match = RegExp(r'([0-9]+(?:\.[0-9]+)?)').firstMatch(unitPriceText);
+    if (match == null) return null;
+    return double.tryParse(match.group(1)!);
+  }
 
   int? get discountPercent {
     if (price == null || mrp == null || mrp! <= price!) return null;
@@ -262,6 +290,12 @@ class RetailerQuote {
         'unitPriceText': unitPriceText,
         'stockStatus': stockStatus.name,
         'lowStockCount': lowStockCount,
+        if (productUrl != null) 'productUrl': productUrl,
+        if (itemId != null) 'itemId': itemId,
+        if (imageUrl != null) 'imageUrl': imageUrl,
+        if (sla != null) 'sla': sla,
+        if (rating != null) 'rating': rating,
+        if (ratingCount != null) 'ratingCount': ratingCount,
       };
 
   factory RetailerQuote.fromJson(Map<String, dynamic> json) {
@@ -281,6 +315,12 @@ class RetailerQuote {
       unitPriceText: _str(json, 'unitPriceText', 'unit_price_text', ''),
       stockStatus: stockStatus,
       lowStockCount: _intOrNull(json, 'lowStockCount', 'low_stock_count'),
+      productUrl: _strOrNull(json, 'productUrl', 'deeplink'),
+      itemId: _strOrNull(json, 'itemId', 'item_id'),
+      imageUrl: _strOrNull(json, 'imageUrl', 'image_url'),
+      sla: _strOrNull(json, 'sla'),
+      rating: _doubleOrNull(json, 'rating'),
+      ratingCount: _intOrNull(json, 'ratingCount', 'rating_count'),
     );
   }
 }
@@ -397,6 +437,10 @@ class Product {
     required this.variants,
     required this.defaultVariantIndex,
     required this.historyByRange,
+    this.imageUrl,
+    this.imageUrls = const [],
+    this.rating,
+    this.ratingCount,
     this.trendTag,
     this.isLowestIn30Days = false,
     this.isTrending = false,
@@ -417,6 +461,10 @@ class Product {
   final List<PackVariant> variants;
   final int defaultVariantIndex;
   final Map<String, PriceHistorySeries> historyByRange;
+  final String? imageUrl;
+  final List<String> imageUrls;
+  final double? rating;
+  final int? ratingCount;
   final String? trendTag;
   final bool isLowestIn30Days;
   final bool isTrending;
@@ -424,6 +472,25 @@ class Product {
   final bool isPriceDrop;
   final RetailerId? onlyOnRetailer;
   final String? oftenAddedNote;
+
+  bool get isLiveProduct =>
+      (imageUrl != null && imageUrl!.isNotEmpty) ||
+      variants.any(
+        (v) => v.quotes.any((q) => q.productUrl != null || q.itemId != null),
+      );
+
+  String? get bestImageUrl {
+    if (imageUrl != null && imageUrl!.trim().isNotEmpty) return imageUrl;
+    if (imageUrls.isNotEmpty) return imageUrls.first;
+    for (final v in variants) {
+      for (final q in v.quotes) {
+        if (q.imageUrl != null && q.imageUrl!.trim().isNotEmpty) {
+          return q.imageUrl;
+        }
+      }
+    }
+    return null;
+  }
 
   PackVariant variantAt(int index) {
     if (index >= 0 && index < variants.length) return variants[index];
@@ -492,6 +559,10 @@ class Product {
     List<PackVariant>? variants,
     int? defaultVariantIndex,
     Map<String, PriceHistorySeries>? historyByRange,
+    String? imageUrl,
+    List<String>? imageUrls,
+    double? rating,
+    int? ratingCount,
     String? trendTag,
     bool? isLowestIn30Days,
     bool? isTrending,
@@ -512,6 +583,10 @@ class Product {
       variants: variants ?? this.variants,
       defaultVariantIndex: defaultVariantIndex ?? this.defaultVariantIndex,
       historyByRange: historyByRange ?? this.historyByRange,
+      imageUrl: imageUrl ?? this.imageUrl,
+      imageUrls: imageUrls ?? this.imageUrls,
+      rating: rating ?? this.rating,
+      ratingCount: ratingCount ?? this.ratingCount,
       trendTag: trendTag ?? this.trendTag,
       isLowestIn30Days: isLowestIn30Days ?? this.isLowestIn30Days,
       isTrending: isTrending ?? this.isTrending,
@@ -535,6 +610,10 @@ class Product {
         'defaultVariantIndex': defaultVariantIndex,
         'historyByRange':
             historyByRange.map((k, v) => MapEntry(k, v.toJson())),
+        if (imageUrl != null) 'imageUrl': imageUrl,
+        if (imageUrls.isNotEmpty) 'imageUrls': imageUrls,
+        if (rating != null) 'rating': rating,
+        if (ratingCount != null) 'ratingCount': ratingCount,
         if (trendTag != null) 'trendTag': trendTag,
         'isLowestIn30Days': isLowestIn30Days,
         'isTrending': isTrending,
@@ -562,6 +641,15 @@ class Product {
         }
       });
     }
+    final imagesRaw = json['imageUrls'] ?? json['images'];
+    final imageUrls = imagesRaw is List
+        ? imagesRaw
+            .map((e) => e?.toString().trim() ?? '')
+            .where((s) => s.isNotEmpty)
+            .toList()
+        : const <String>[];
+    final imageUrl = _strOrNull(json, 'imageUrl', 'image_url') ??
+        (imageUrls.isNotEmpty ? imageUrls.first : null);
     return Product(
       id: _str(json, 'id'),
       name: _str(json, 'name'),
@@ -580,6 +668,10 @@ class Product {
       defaultVariantIndex:
           _int(json, 'defaultVariantIndex', 'default_variant_index', 0),
       historyByRange: history,
+      imageUrl: imageUrl,
+      imageUrls: imageUrls,
+      rating: _doubleOrNull(json, 'rating'),
+      ratingCount: _intOrNull(json, 'ratingCount', 'rating_count'),
       trendTag: _strOrNull(json, 'trendTag', 'trend_tag'),
       isLowestIn30Days:
           _bool(json, 'isLowestIn30Days', 'is_lowest_in_30_days'),
@@ -828,6 +920,8 @@ class SavedLocation {
     required this.pincode,
     required this.area,
     this.isDefault = false,
+    this.lat,
+    this.lng,
   });
 
   final String id;
@@ -835,12 +929,16 @@ class SavedLocation {
   final String pincode;
   final String area;
   final bool isDefault;
+  final double? lat;
+  final double? lng;
 
   SavedLocation copyWith({
     String? label,
     String? pincode,
     String? area,
     bool? isDefault,
+    double? lat,
+    double? lng,
   }) {
     return SavedLocation(
       id: id,
@@ -848,6 +946,8 @@ class SavedLocation {
       pincode: pincode ?? this.pincode,
       area: area ?? this.area,
       isDefault: isDefault ?? this.isDefault,
+      lat: lat ?? this.lat,
+      lng: lng ?? this.lng,
     );
   }
 
@@ -857,6 +957,8 @@ class SavedLocation {
         'pincode': pincode,
         'area': area,
         'isDefault': isDefault,
+        if (lat != null) 'lat': lat,
+        if (lng != null) 'lng': lng,
       };
 
   factory SavedLocation.fromJson(Map<String, dynamic> json) => SavedLocation(
@@ -865,6 +967,8 @@ class SavedLocation {
         pincode: _str(json, 'pincode'),
         area: _str(json, 'area'),
         isDefault: _bool(json, 'isDefault', 'is_default', false),
+        lat: _doubleOrNull(json, 'lat'),
+        lng: _doubleOrNull(json, 'lng', 'lon'),
       );
 }
 
@@ -877,6 +981,7 @@ class SearchHistoryEntry {
     required this.isToday,
     required this.artKind,
     required this.pastel,
+    this.imageUrl,
   });
 
   final String id;
@@ -885,6 +990,7 @@ class SearchHistoryEntry {
   final bool isToday;
   final ProductArtKind artKind;
   final SastaPastel pastel;
+  final String? imageUrl;
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -893,6 +999,7 @@ class SearchHistoryEntry {
         'isToday': isToday,
         'artKind': artKind.name,
         'pastel': pastel.name,
+        if (imageUrl != null) 'imageUrl': imageUrl,
       };
 
   factory SearchHistoryEntry.fromJson(Map<String, dynamic> json) =>
@@ -903,6 +1010,7 @@ class SearchHistoryEntry {
         isToday: _bool(json, 'isToday', 'is_today', true),
         artKind: _parseArtKind(_strOrNull(json, 'artKind', 'art_kind')),
         pastel: _parsePastel(_strOrNull(json, 'pastel')),
+        imageUrl: _strOrNull(json, 'imageUrl', 'image_url'),
       );
 }
 
@@ -1078,12 +1186,13 @@ class BasketComparisonResult {
   }
 
   int get percentSavedVsPriciest {
-    if (priciestCompleteStore == null ||
-        priciestCompleteStore!.totalPrice <= 0) {
-      return 0;
-    }
-    return ((savingsVsPriciest / priciestCompleteStore!.totalPrice) * 100)
-        .round();
+    final baseline = priciestCompleteStore?.totalPrice ??
+        perItemSavings.fold<int>(
+          0,
+          (s, e) => s + e.worstUnitPrice * e.quantity,
+        );
+    if (baseline <= 0) return 0;
+    return ((savingsVsPriciest / baseline) * 100).round();
   }
 
   int get splitSavingsOverBestSingle {

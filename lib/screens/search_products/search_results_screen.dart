@@ -46,6 +46,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
       _sortBy = state.defaultSort;
       _initialized = true;
       if (state.isApiConfigured &&
+          !state.onDemandLiveMode &&
           (_query.trim().isNotEmpty || (_categoryId?.isNotEmpty ?? false))) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted) return;
@@ -118,7 +119,12 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
-                    children: ['Lowest price', 'Discount', 'Availability'].map((s) {
+                    children: [
+                      'Lowest price',
+                      'Best unit price',
+                      'Discount',
+                      'Availability',
+                    ].map((s) {
                       return SastaChip(
                         label: s,
                         selected: _sortBy == s,
@@ -156,6 +162,10 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
     );
     if (widget.args?.dealsOnly == true && _query.isEmpty && _categoryId == null) {
       results = results.where((p) => p.isDeal).toList();
+    } else if (widget.args?.trendingOnly == true &&
+        _query.isEmpty &&
+        _categoryId == null) {
+      results = results.where((p) => p.isTrending).toList();
     }
 
     final headingText = _query.trim().isNotEmpty
@@ -194,10 +204,21 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                               state.addSearchQuery(v);
                               setState(() => _query = v);
                               if (state.isApiConfigured) {
-                                state.searchProductsRemote(
-                                  v,
+                                final hasCached = state.hasFreshCacheFor(
+                                  query: v,
                                   categoryId: _categoryId,
                                 );
+                                if (!hasCached && state.isLiveQuotaExhausted) {
+                                  showSastaToast(
+                                    context,
+                                    'Daily ${SastaAppState.freeDailyLiveSearchLimit}/${SastaAppState.freeDailyLiveSearchLimit} free live searches used. Showing cached prices.',
+                                  );
+                                } else {
+                                  state.searchProductsRemote(
+                                    v,
+                                    categoryId: _categoryId,
+                                  );
+                                }
                               }
                             },
                             onClear: () => setState(() {
@@ -243,8 +264,63 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 14),
-                    Text(headingText, style: SastaText.muted(context, size: 13)),
+                    const SizedBox(height: 12),
+                    if (state.isApiConfigured &&
+                        (_query.trim().isNotEmpty ||
+                            (_categoryId?.isNotEmpty ?? false))) ...[
+                      _LiveFetchBanner(
+                        hasFreshCache: state.hasFreshCacheFor(
+                          query: _query,
+                          categoryId: _categoryId,
+                        ),
+                        estimatedCredits: state.estimatedCreditsPerSearch,
+                        hasUnlimited: state.hasUnlimitedLiveSearches,
+                        remainingFree: state.remainingFreeLiveSearches,
+                        isLoading: state.isSearchingRemote,
+                        onFetchLive: () {
+                          if (state.isSearchingRemote) return;
+                          if (state.isLiveQuotaExhausted) {
+                            showSastaToast(
+                              context,
+                              'Daily ${SastaAppState.freeDailyLiveSearchLimit}/${SastaAppState.freeDailyLiveSearchLimit} free live searches used. Showing cached prices.',
+                            );
+                            return;
+                          }
+                          state.searchProductsRemote(
+                            _query,
+                            categoryId: _categoryId,
+                            forceRefresh: true,
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 10),
+                    ],
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            headingText,
+                            style: SastaText.muted(context, size: 13),
+                          ),
+                        ),
+                        if (state.isSearchingRemote)
+                          Text(
+                            'Updating live…',
+                            style: SastaText.muted(
+                              context,
+                              size: 12,
+                              weight: FontWeight.w600,
+                            ),
+                          ),
+                      ],
+                    ),
+                    if (state.isSearchingRemote) ...[
+                      const SizedBox(height: 6),
+                      const ClipRRect(
+                        borderRadius: BorderRadius.all(Radius.circular(2)),
+                        child: LinearProgressIndicator(minHeight: 3),
+                      ),
+                    ],
                     const SizedBox(height: 12),
                   ],
                 ),
@@ -284,6 +360,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                                   _retailerFilter = null;
                                   _inStockOnly = false;
                                   _under50 = false;
+                                  _sortBy = state.defaultSort;
                                 }),
                               ),
                             ],
@@ -302,11 +379,11 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                           crossAxisCount: 2,
                           mainAxisSpacing: 12,
                           crossAxisSpacing: 12,
-                          mainAxisExtent: 192 +
-                              34 *
+                          mainAxisExtent: 186 +
+                              52 *
                                   MediaQuery.textScalerOf(context)
                                       .scale(1.0)
-                                      .clamp(1.0, 2.0),
+                                      .clamp(1.0, 2.8),
                         ),
                         itemCount: results.length,
                         itemBuilder: (context, i) {
@@ -315,13 +392,26 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                             product.defaultVariantIndex,
                             enabledRetailers: state.enabledRetailers,
                           );
+                          final availCount = product.availableAppCount(
+                            product.defaultVariantIndex,
+                            enabledRetailers: state.enabledRetailers,
+                          );
                           final pct = cheapest?.discountPercent;
+                          final badge = pct != null
+                              ? '-$pct%'
+                              : product.isLowestIn30Days
+                                  ? 'Lowest'
+                                  : (availCount >= 3 &&
+                                          product.trendTag ==
+                                              'Widely available'
+                                      ? '$availCount apps'
+                                      : null);
                           return ProductGridCard(
                             product: product,
                             enabledRetailers: state.enabledRetailers,
                             isFavourite: state.isFavourite(product.id),
                             showFavouriteButton: true,
-                            badgeText: pct != null ? '-$pct%' : null,
+                            badgeText: badge,
                             onToggleFavourite: () =>
                                 state.toggleFavourite(product.id),
                             onTap: () => SastaNav.openProductDetails(
@@ -335,6 +425,91 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _LiveFetchBanner extends StatelessWidget {
+  const _LiveFetchBanner({
+    required this.hasFreshCache,
+    required this.estimatedCredits,
+    required this.hasUnlimited,
+    required this.remainingFree,
+    required this.isLoading,
+    required this.onFetchLive,
+  });
+
+  final bool hasFreshCache;
+  final int estimatedCredits;
+  final bool hasUnlimited;
+  final int? remainingFree;
+  final bool isLoading;
+  final VoidCallback onFetchLive;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.sasta;
+    final statusLabel = hasFreshCache
+        ? 'Cached live prices · 0 credits'
+        : hasUnlimited
+            ? 'Cached catalog · Fetch live prices'
+            : 'Saved catalog · Live ~$estimatedCredits cr (${remainingFree ?? 0}/${SastaAppState.freeDailyLiveSearchLimit} left)';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: palette.field,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: palette.divider),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            hasFreshCache
+                ? Icons.offline_pin_outlined
+                : Icons.bolt_rounded,
+            size: 16,
+            color: hasFreshCache ? palette.successText : palette.warningAccent,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              statusLabel,
+              style: SastaText.muted(context, size: 12, weight: FontWeight.w600),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: isLoading ? null : onFetchLive,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: hasFreshCache ? Colors.transparent : palette.primaryCtaBg,
+                borderRadius: BorderRadius.circular(14),
+                border: hasFreshCache
+                    ? Border.all(color: palette.divider)
+                    : null,
+              ),
+              child: Text(
+                isLoading
+                    ? 'Loading…'
+                    : hasFreshCache
+                        ? 'Refresh'
+                        : 'Fetch live',
+                style: SastaText.body(
+                  context,
+                  size: 11,
+                  weight: FontWeight.w700,
+                  color: hasFreshCache
+                      ? palette.ink
+                      : palette.primaryCtaFg,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

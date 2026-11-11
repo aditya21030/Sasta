@@ -15,18 +15,25 @@ class SavedAppSnapshot {
     this.area,
     this.isOnboarded,
     this.isDarkMode,
+    this.themeModeName,
     this.useLocation,
     this.priceDropAlerts,
+    this.targetAlertsNotif,
     this.backInStockAlerts,
+    this.newDealsNotif,
+    this.basketSavingsNotif,
     this.weeklyDigest,
+    this.appUpdatesNotif,
     this.enabledRetailerIds,
     this.sortMode,
     this.hideOos,
     this.showUnitPrice,
     this.deliveryFeeMode,
     this.autoMatchVariants,
+    this.suggestAlternatives,
     this.basketMode,
     this.selectedPlan,
+    this.autoRenew,
     this.activeBasketId,
     this.recentlyViewedIds,
     this.apiBaseUrl,
@@ -43,6 +50,13 @@ class SavedAppSnapshot {
     this.tickets,
     this.invoices,
     this.cachedProducts,
+    this.serviceableRetailerIds,
+    this.retailerEtas,
+    this.onDemandLiveMode,
+    this.queryCacheTimestampsMs,
+    this.queryCacheProductIds,
+    this.dailyLiveSearchDate,
+    this.dailyLiveSearchesUsed,
   });
 
   final String? userName;
@@ -53,18 +67,25 @@ class SavedAppSnapshot {
   final String? area;
   final bool? isOnboarded;
   final bool? isDarkMode;
+  final String? themeModeName;
   final bool? useLocation;
   final bool? priceDropAlerts;
+  final bool? targetAlertsNotif;
   final bool? backInStockAlerts;
+  final bool? newDealsNotif;
+  final bool? basketSavingsNotif;
   final bool? weeklyDigest;
+  final bool? appUpdatesNotif;
   final List<String>? enabledRetailerIds;
   final String? sortMode;
   final bool? hideOos;
   final bool? showUnitPrice;
   final String? deliveryFeeMode;
   final bool? autoMatchVariants;
+  final bool? suggestAlternatives;
   final String? basketMode;
   final SastaPlanType? selectedPlan;
+  final bool? autoRenew;
   final String? activeBasketId;
   final List<String>? recentlyViewedIds;
   final String? apiBaseUrl;
@@ -81,6 +102,13 @@ class SavedAppSnapshot {
   final List<SupportTicket>? tickets;
   final List<SubscriptionInvoice>? invoices;
   final List<Product>? cachedProducts;
+  final List<String>? serviceableRetailerIds;
+  final Map<String, String>? retailerEtas;
+  final bool? onDemandLiveMode;
+  final Map<String, int>? queryCacheTimestampsMs;
+  final Map<String, List<String>>? queryCacheProductIds;
+  final String? dailyLiveSearchDate;
+  final int? dailyLiveSearchesUsed;
 
   Map<String, dynamic> toJson() => {
         'v': 1,
@@ -92,10 +120,16 @@ class SavedAppSnapshot {
         if (area != null) 'area': area,
         if (isOnboarded != null) 'isOnboarded': isOnboarded,
         if (isDarkMode != null) 'isDarkMode': isDarkMode,
+        if (themeModeName != null) 'themeModeName': themeModeName,
         if (useLocation != null) 'useLocation': useLocation,
         if (priceDropAlerts != null) 'priceDropAlerts': priceDropAlerts,
+        if (targetAlertsNotif != null) 'targetAlertsNotif': targetAlertsNotif,
         if (backInStockAlerts != null) 'backInStockAlerts': backInStockAlerts,
+        if (newDealsNotif != null) 'newDealsNotif': newDealsNotif,
+        if (basketSavingsNotif != null)
+          'basketSavingsNotif': basketSavingsNotif,
         if (weeklyDigest != null) 'weeklyDigest': weeklyDigest,
+        if (appUpdatesNotif != null) 'appUpdatesNotif': appUpdatesNotif,
         if (enabledRetailerIds != null)
           'enabledRetailerIds': enabledRetailerIds,
         if (sortMode != null) 'sortMode': sortMode,
@@ -103,8 +137,11 @@ class SavedAppSnapshot {
         if (showUnitPrice != null) 'showUnitPrice': showUnitPrice,
         if (deliveryFeeMode != null) 'deliveryFeeMode': deliveryFeeMode,
         if (autoMatchVariants != null) 'autoMatchVariants': autoMatchVariants,
+        if (suggestAlternatives != null)
+          'suggestAlternatives': suggestAlternatives,
         if (basketMode != null) 'basketMode': basketMode,
         if (selectedPlan != null) 'selectedPlan': selectedPlan!.name,
+        if (autoRenew != null) 'autoRenew': autoRenew,
         if (activeBasketId != null) 'activeBasketId': activeBasketId,
         if (recentlyViewedIds != null) 'recentlyViewedIds': recentlyViewedIds,
         if (apiBaseUrl != null) 'apiBaseUrl': apiBaseUrl,
@@ -130,6 +167,18 @@ class SavedAppSnapshot {
           'invoices': invoices!.map((e) => e.toJson()).toList(),
         if (cachedProducts != null)
           'cachedProducts': cachedProducts!.map((e) => e.toJson()).toList(),
+        if (serviceableRetailerIds != null)
+          'serviceableRetailerIds': serviceableRetailerIds,
+        if (retailerEtas != null) 'retailerEtas': retailerEtas,
+        if (onDemandLiveMode != null) 'onDemandLiveMode': onDemandLiveMode,
+        if (queryCacheTimestampsMs != null)
+          'queryCacheTimestampsMs': queryCacheTimestampsMs,
+        if (queryCacheProductIds != null)
+          'queryCacheProductIds': queryCacheProductIds,
+        if (dailyLiveSearchDate != null)
+          'dailyLiveSearchDate': dailyLiveSearchDate,
+        if (dailyLiveSearchesUsed != null)
+          'dailyLiveSearchesUsed': dailyLiveSearchesUsed,
       };
 
   factory SavedAppSnapshot.fromJson(Map<String, dynamic> j) {
@@ -158,6 +207,39 @@ class SavedAppSnapshot {
       return null;
     }
 
+    Map<String, int>? decodeIntMap(String key) {
+      final raw = j[key];
+      if (raw is! Map) return null;
+      final out = <String, int>{};
+      raw.forEach((k, v) {
+        final parsed = v is num ? v.toInt() : int.tryParse(v?.toString() ?? '');
+        if (parsed != null) out[k.toString()] = parsed;
+      });
+      return out;
+    }
+
+    Map<String, List<String>>? decodeStringListMap(String key) {
+      final raw = j[key];
+      if (raw is! Map) return null;
+      final out = <String, List<String>>{};
+      raw.forEach((k, v) {
+        if (v is List) {
+          out[k.toString()] = v.map((e) => e.toString()).toList();
+        }
+      });
+      return out;
+    }
+
+    Map<String, String>? decodeStringMap(String key) {
+      final raw = j[key];
+      if (raw is! Map) return null;
+      final out = <String, String>{};
+      raw.forEach((k, v) {
+        if (v != null) out[k.toString()] = v.toString();
+      });
+      return out;
+    }
+
     return SavedAppSnapshot(
       userName: j['userName']?.toString(),
       userEmail: j['userEmail']?.toString(),
@@ -167,18 +249,25 @@ class SavedAppSnapshot {
       area: j['area']?.toString(),
       isOnboarded: j['isOnboarded'] as bool?,
       isDarkMode: j['isDarkMode'] as bool?,
+      themeModeName: j['themeModeName']?.toString(),
       useLocation: j['useLocation'] as bool?,
       priceDropAlerts: j['priceDropAlerts'] as bool?,
+      targetAlertsNotif: j['targetAlertsNotif'] as bool?,
       backInStockAlerts: j['backInStockAlerts'] as bool?,
+      newDealsNotif: j['newDealsNotif'] as bool?,
+      basketSavingsNotif: j['basketSavingsNotif'] as bool?,
       weeklyDigest: j['weeklyDigest'] as bool?,
+      appUpdatesNotif: j['appUpdatesNotif'] as bool?,
       enabledRetailerIds: decodeStrings('enabledRetailerIds'),
       sortMode: j['sortMode']?.toString(),
       hideOos: j['hideOos'] as bool?,
       showUnitPrice: j['showUnitPrice'] as bool?,
       deliveryFeeMode: j['deliveryFeeMode']?.toString(),
       autoMatchVariants: j['autoMatchVariants'] as bool?,
+      suggestAlternatives: j['suggestAlternatives'] as bool?,
       basketMode: j['basketMode']?.toString(),
       selectedPlan: parsePlan(j['selectedPlan']?.toString()),
+      autoRenew: j['autoRenew'] as bool?,
       activeBasketId: j['activeBasketId']?.toString(),
       recentlyViewedIds: decodeStrings('recentlyViewedIds'),
       apiBaseUrl: j['apiBaseUrl']?.toString(),
@@ -195,6 +284,15 @@ class SavedAppSnapshot {
       tickets: decodeList('tickets', SupportTicket.fromJson),
       invoices: decodeList('invoices', SubscriptionInvoice.fromJson),
       cachedProducts: decodeList('cachedProducts', Product.fromJson),
+      serviceableRetailerIds: decodeStrings('serviceableRetailerIds'),
+      retailerEtas: decodeStringMap('retailerEtas'),
+      onDemandLiveMode: j['onDemandLiveMode'] as bool?,
+      queryCacheTimestampsMs: decodeIntMap('queryCacheTimestampsMs'),
+      queryCacheProductIds: decodeStringListMap('queryCacheProductIds'),
+      dailyLiveSearchDate: j['dailyLiveSearchDate']?.toString(),
+      dailyLiveSearchesUsed: j['dailyLiveSearchesUsed'] is num
+          ? (j['dailyLiveSearchesUsed'] as num).toInt()
+          : int.tryParse(j['dailyLiveSearchesUsed']?.toString() ?? ''),
     );
   }
 }

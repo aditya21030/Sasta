@@ -14,6 +14,8 @@ class ResolvedPincode {
     this.city,
     this.state,
     this.source = 'manual',
+    this.lat,
+    this.lng,
   });
 
   final String pincode;
@@ -21,6 +23,27 @@ class ResolvedPincode {
   final String? city;
   final String? state;
   final String source;
+  final double? lat;
+  final double? lng;
+
+  ResolvedPincode copyWith({
+    String? area,
+    String? city,
+    String? state,
+    String? source,
+    double? lat,
+    double? lng,
+  }) {
+    return ResolvedPincode(
+      pincode: pincode,
+      area: area ?? this.area,
+      city: city ?? this.city,
+      state: state ?? this.state,
+      source: source ?? this.source,
+      lat: lat ?? this.lat,
+      lng: lng ?? this.lng,
+    );
+  }
 
   String get displayArea => area.trim().isNotEmpty
       ? area.trim()
@@ -64,8 +87,41 @@ class PincodeLocationService {
   final PositionProvider? _positionProvider;
   final ReverseGeocoderProvider? _reverseGeocoderProvider;
 
-  static final RegExp _sixDigitRegex = RegExp(r'^\d{6}$');
+  // Indian PIN codes are 6 digits starting with 1-9 (zone 1-8 or 9 APS).
+  static final RegExp _sixDigitRegex = RegExp(r'^[1-9]\d{5}$');
   final Map<String, ResolvedPincode> _pincodeCache = {};
+  final Map<String, ({double lat, double lng})> _coordsCache = {};
+
+  static const Map<String, ({double lat, double lng})> _knownPincodeCoords = {
+    '110001': (lat: 28.6304, lng: 77.2177), // Central Delhi
+    '560001': (lat: 12.9716, lng: 77.5946), // Bengaluru CBD
+    '560034': (lat: 12.9352, lng: 77.6245), // Koramangala
+    '560038': (lat: 12.9784, lng: 77.6408), // Indiranagar
+    '560102': (lat: 12.9116, lng: 77.6389), // HSR Layout
+    '400001': (lat: 18.9388, lng: 72.8354), // South Mumbai
+    '500001': (lat: 17.3850, lng: 78.4867), // Hyderabad
+    '600001': (lat: 13.0827, lng: 80.2707), // Chennai
+    '411001': (lat: 18.5204, lng: 73.8567), // Pune
+    '700001': (lat: 22.5726, lng: 88.3639), // Kolkata
+    '122001': (lat: 28.4595, lng: 77.0266), // Gurugram
+    '201301': (lat: 28.5706, lng: 77.3272), // Noida
+    '380001': (lat: 23.0225, lng: 72.5714), // Ahmedabad
+  };
+
+  static const Map<String, ({double lat, double lng})> _prefixCentroids = {
+    '110': (lat: 28.6139, lng: 77.2090), // Delhi
+    '122': (lat: 28.4595, lng: 77.0266), // Gurugram
+    '201': (lat: 28.5355, lng: 77.3910), // Noida / Ghaziabad
+    '302': (lat: 26.9124, lng: 75.7873), // Jaipur
+    '380': (lat: 23.0225, lng: 72.5714), // Ahmedabad
+    '400': (lat: 19.0760, lng: 72.8777), // Mumbai
+    '411': (lat: 18.5204, lng: 73.8567), // Pune
+    '500': (lat: 17.3850, lng: 78.4867), // Hyderabad
+    '560': (lat: 12.9716, lng: 77.5946), // Bengaluru
+    '600': (lat: 13.0827, lng: 80.2707), // Chennai
+    '682': (lat: 9.9312, lng: 76.2673), // Kochi
+    '700': (lat: 22.5726, lng: 88.3639), // Kolkata
+  };
 
   static bool isValidPincode(String input) =>
       _sixDigitRegex.hasMatch(input.trim());
@@ -189,6 +245,8 @@ class PincodeLocationService {
         }
       }
 
+      resolved = resolved.copyWith(lat: coords.lat, lng: coords.lng);
+      _coordsCache[resolved.pincode] = coords;
       return LocationDetectResult(resolved: resolved);
     } on MissingPluginException {
       return const LocationDetectResult(
@@ -302,6 +360,73 @@ class PincodeLocationService {
     } catch (_) {
       return null;
     }
+  }
+
+  /// Resolves approximate lat/lng coordinates for a 6-digit Indian pincode
+  /// (exact lookup -> native geocoder -> Nominatim -> 3-digit PIN city centroid).
+  Future<({double lat, double lng})> resolveCoordinatesForPincode(
+    String rawPincode,
+  ) async {
+    final pin = rawPincode.trim();
+    if (!isValidPincode(pin)) {
+      return (lat: 12.9716, lng: 77.5946);
+    }
+    final cached = _coordsCache[pin] ?? _knownPincodeCoords[pin];
+    if (cached != null) return cached;
+
+    try {
+      final locations = await geocoding.Geocoding()
+          .locationFromAddress('$pin, India')
+          .timeout(const Duration(seconds: 5));
+      if (locations.isNotEmpty) {
+        final coords =
+            (lat: locations.first.latitude, lng: locations.first.longitude);
+        _coordsCache[pin] = coords;
+        return coords;
+      }
+    } catch (_) {
+      // Fall through to Nominatim / prefix centroids cleanly.
+    }
+
+    try {
+      final uri = Uri.https('nominatim.openstreetmap.org', '/search', {
+        'postalcode': pin,
+        'countrycodes': 'in',
+        'format': 'jsonv2',
+        'limit': '1',
+      });
+      final response = await _client.get(
+        uri,
+        headers: const {'User-Agent': 'SastaQuickCommerceApp/1.0'},
+      ).timeout(const Duration(seconds: 5));
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+        if (decoded is List && decoded.isNotEmpty && decoded.first is Map) {
+          final row = decoded.first as Map;
+          final lat = double.tryParse(row['lat']?.toString() ?? '');
+          final lng = double.tryParse(row['lon']?.toString() ?? '');
+          if (lat != null && lng != null) {
+            final coords = (lat: lat, lng: lng);
+            _coordsCache[pin] = coords;
+            return coords;
+          }
+        }
+      }
+    } catch (_) {
+      // Fall back to city prefix centroid below.
+    }
+
+    final prefix = pin.substring(0, 3);
+    return _prefixCentroids[prefix] ?? (lat: 28.6139, lng: 77.2090);
+  }
+
+  /// Synchronous lookup from built-in major hub coordinates & city centroids.
+  static ({double lat, double lng})? fallbackCoordinatesSync(
+    String rawPincode,
+  ) {
+    final pin = rawPincode.trim();
+    if (!_sixDigitRegex.hasMatch(pin)) return null;
+    return _knownPincodeCoords[pin] ?? _prefixCentroids[pin.substring(0, 3)];
   }
 
   String? _pickDistinctPart(List<String?> candidates) {

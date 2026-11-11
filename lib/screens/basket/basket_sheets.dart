@@ -306,35 +306,39 @@ class _ShareTile extends StatelessWidget {
 Future<void> showCreateBasketDialog(BuildContext context) async {
   final state = SastaScope.read(context);
   final controller = TextEditingController();
-  await showSastaSheet(
-    context: context,
-    builder: (ctx) => Padding(
-      padding: const EdgeInsets.fromLTRB(22, 16, 22, 28),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text('Create new basket', style: SastaText.display(ctx, size: 22)),
-          const SizedBox(height: 12),
-          SastaSearchPill(
-            controller: controller,
-            hintText: 'e.g. Weekend Brunch',
-            showMic: false,
-            autofocus: true,
-          ),
-          const SizedBox(height: 16),
-          SastaPrimaryButton(
-            label: 'Create basket',
-            onPressed: () {
-              final created = state.createNewBasket(controller.text);
-              Navigator.of(ctx).pop();
-              showSastaToast(context, 'Switched to ${created.name}');
-            },
-          ),
-        ],
+  try {
+    await showSastaSheet(
+      context: context,
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(22, 16, 22, 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('Create new basket', style: SastaText.display(ctx, size: 22)),
+            const SizedBox(height: 12),
+            SastaSearchPill(
+              controller: controller,
+              hintText: 'e.g. Weekend Brunch',
+              showMic: false,
+              autofocus: true,
+            ),
+            const SizedBox(height: 16),
+            SastaPrimaryButton(
+              label: 'Create basket',
+              onPressed: () {
+                final created = state.createNewBasket(controller.text);
+                Navigator.of(ctx).pop();
+                showSastaToast(context, 'Switched to ${created.name}');
+              },
+            ),
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  } finally {
+    controller.dispose();
+  }
 }
 
 Future<void> showRenameBasketDialog(
@@ -343,35 +347,39 @@ Future<void> showRenameBasketDialog(
 ) async {
   final state = SastaScope.read(context);
   final controller = TextEditingController(text: basket.name);
-  await showSastaSheet(
-    context: context,
-    builder: (ctx) => Padding(
-      padding: const EdgeInsets.fromLTRB(22, 16, 22, 28),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text('Rename basket', style: SastaText.display(ctx, size: 22)),
-          const SizedBox(height: 12),
-          SastaSearchPill(
-            controller: controller,
-            hintText: 'Basket name',
-            showMic: false,
-            autofocus: true,
-          ),
-          const SizedBox(height: 16),
-          SastaPrimaryButton(
-            label: 'Save name',
-            onPressed: () {
-              state.renameBasket(basket.id, controller.text);
-              Navigator.of(ctx).pop();
-              showSastaToast(context, 'Basket renamed');
-            },
-          ),
-        ],
+  try {
+    await showSastaSheet(
+      context: context,
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(22, 16, 22, 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('Rename basket', style: SastaText.display(ctx, size: 22)),
+            const SizedBox(height: 12),
+            SastaSearchPill(
+              controller: controller,
+              hintText: 'Basket name',
+              showMic: false,
+              autofocus: true,
+            ),
+            const SizedBox(height: 16),
+            SastaPrimaryButton(
+              label: 'Save name',
+              onPressed: () {
+                state.renameBasket(basket.id, controller.text);
+                Navigator.of(ctx).pop();
+                showSastaToast(context, 'Basket renamed');
+              },
+            ),
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  } finally {
+    controller.dispose();
+  }
 }
 
 Future<void> showTemplatePreviewSheet(
@@ -408,7 +416,10 @@ Future<void> showTemplatePreviewSheet(
               Builder(builder: (context) {
                 final p = state.productById(id);
                 if (p == null) return const SizedBox.shrink();
-                final q = p.cheapestQuote(p.defaultVariantIndex);
+                final q = p.cheapestQuote(
+                  p.defaultVariantIndex,
+                  enabledRetailers: state.enabledRetailers,
+                );
                 return Padding(
                   padding: const EdgeInsets.symmetric(vertical: 6),
                   child: Row(
@@ -416,6 +427,7 @@ Future<void> showTemplatePreviewSheet(
                       ProductArtTile(
                         kind: p.artKind,
                         pastel: p.pastel,
+                        imageUrl: p.bestImageUrl,
                         size: 44,
                       ),
                       const SizedBox(width: 10),

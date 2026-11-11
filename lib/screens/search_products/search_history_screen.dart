@@ -159,6 +159,7 @@ class _HistoryRow extends StatelessWidget {
             ProductArtTile(
               kind: entry.artKind,
               pastel: entry.pastel,
+              imageUrl: entry.imageUrl,
               size: 56,
             ),
             const SizedBox(width: 12),

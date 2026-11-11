@@ -45,6 +45,7 @@ class ProfileScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final state = SastaScope.of(context);
     final palette = context.sasta;
+    final avatarStyle = _avatarStyleFor(state.avatarStyleIndex, palette);
 
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
@@ -66,9 +67,9 @@ class ProfileScreen extends StatelessWidget {
                   amplitude: 5,
                   child: SastaMascot(
                     size: 108,
-                    color: SastaColors.flipkartMinutes,
-                    expression: MascotExpression.joy,
-                    haloColor: palette.sky,
+                    color: avatarStyle.color,
+                    expression: avatarStyle.expression,
+                    haloColor: avatarStyle.halo,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -391,12 +392,16 @@ class ProfileScreen extends StatelessWidget {
             onTap: () => _confirmAction(
               context,
               title: 'Delete account?',
-              body: 'This removes your saved alerts and profile data.',
+              body:
+                  'This deletes your local baskets, alerts, locations, and profile data.',
               confirmLabel: 'Delete',
               confirmColor: palette.dangerText,
               onConfirm: () {
-                state.logOut();
-                showSastaToast(context, 'Account deletion request submitted');
+                state.deleteAccount().then((_) {
+                  if (context.mounted) {
+                    showSastaToast(context, 'Account data removed');
+                  }
+                });
               },
             ),
           ),
@@ -404,4 +409,32 @@ class ProfileScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+({Color color, MascotExpression expression, Color halo}) _avatarStyleFor(
+  int index,
+  SastaPalette palette,
+) {
+  return switch (index % 4) {
+    1 => (
+        color: SastaColors.zepto,
+        expression: MascotExpression.happy,
+        halo: palette.lavender,
+      ),
+    2 => (
+        color: SastaColors.blinkit,
+        expression: MascotExpression.calm,
+        halo: palette.butter,
+      ),
+    3 => (
+        color: SastaColors.instamart,
+        expression: MascotExpression.joy,
+        halo: palette.peach,
+      ),
+    _ => (
+        color: SastaColors.flipkartMinutes,
+        expression: MascotExpression.joy,
+        halo: palette.sky,
+      ),
+  };
 }

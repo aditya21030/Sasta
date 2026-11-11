@@ -214,9 +214,25 @@ class BasketScreen extends StatelessWidget {
               const SizedBox(height: 16),
               if (state.basketOfflineError)
                 _BasketErrorCard(
-                  onRetry: () {
+                  onRetry: () async {
                     state.setBasketOfflineError(false);
-                    showSastaToast(context, 'Price data refreshed');
+                    if (state.isApiConfigured) {
+                      final ok =
+                          await state.syncCatalogForLocation(forceRefresh: true);
+                      if (!context.mounted) return;
+                      if (!ok) {
+                        state.setBasketOfflineError(true);
+                        showSastaToast(
+                          context,
+                          state.lastSyncError ??
+                              'Still offline · please check your connection',
+                        );
+                        return;
+                      }
+                    }
+                    if (context.mounted) {
+                      showSastaToast(context, 'Price data refreshed');
+                    }
                   },
                 )
               else
@@ -256,10 +272,27 @@ class BasketScreen extends StatelessWidget {
                             SastaCircleIconButton(
                               icon: Icons.refresh_rounded,
                               tooltip: 'Refresh basket prices',
-                              onPressed: () => showSastaToast(
-                                context,
-                                'Prices verified for ${state.activeLocation.pincode}',
-                              ),
+                              onPressed: () async {
+                                if (!state.isApiConfigured) {
+                                  showSastaToast(
+                                    context,
+                                    'Prices verified for ${state.activeLocation.pincode}',
+                                  );
+                                  return;
+                                }
+                                final ok = await state.syncCatalogForLocation(
+                                  forceRefresh: true,
+                                );
+                                if (!context.mounted) return;
+                                if (!ok && state.lastSyncError != null) {
+                                  showSastaToast(context, state.lastSyncError!);
+                                } else {
+                                  showSastaToast(
+                                    context,
+                                    'Prices verified for ${state.activeLocation.pincode}',
+                                  );
+                                }
+                              },
                             ),
                           ],
                         ),
@@ -416,6 +449,7 @@ class BasketScreen extends StatelessWidget {
                                 ProductArtTile(
                                   kind: product.artKind,
                                   pastel: product.pastel,
+                                  imageUrl: product.bestImageUrl,
                                   size: 60,
                                 ),
                                 const SizedBox(width: 12),
@@ -457,11 +491,13 @@ class BasketScreen extends StatelessWidget {
                                       state.updateBasketItemQuantity(
                                     product.id,
                                     entry.quantity - 1,
+                                    variantIndex: entry.variantIndex,
                                   ),
                                   onIncrement: () =>
                                       state.updateBasketItemQuantity(
                                     product.id,
                                     entry.quantity + 1,
+                                    variantIndex: entry.variantIndex,
                                   ),
                                 ),
                               ],
@@ -495,6 +531,7 @@ class BasketScreen extends StatelessWidget {
                                   onTap: () => state.updateBasketItemQuantity(
                                     product.id,
                                     0,
+                                    variantIndex: entry.variantIndex,
                                   ),
                                   customBorder: const CircleBorder(),
                                   child: Container(
@@ -533,6 +570,7 @@ class BasketScreen extends StatelessWidget {
                           ProductArtTile(
                             kind: product.artKind,
                             pastel: product.pastel,
+                            imageUrl: product.bestImageUrl,
                             size: 64,
                           ),
                           const SizedBox(width: 12),
@@ -620,11 +658,13 @@ class BasketScreen extends StatelessWidget {
                                     state.updateBasketItemQuantity(
                                   product.id,
                                   entry.quantity - 1,
+                                  variantIndex: entry.variantIndex,
                                 ),
                                 onIncrement: () =>
                                     state.updateBasketItemQuantity(
                                   product.id,
                                   entry.quantity + 1,
+                                  variantIndex: entry.variantIndex,
                                 ),
                               ),
                               const SizedBox(height: 6),
@@ -1073,7 +1113,9 @@ class BasketScreen extends StatelessWidget {
                           ],
                         ),
                       ),
-                      if (act.kind == 'removed' && act.productId != null)
+                      if (act.kind == 'removed' &&
+                          act.productId != null &&
+                          state.productById(act.productId!) != null)
                         SastaChip(
                           label: 'Restore',
                           height: 34,
@@ -1128,7 +1170,10 @@ class BasketScreen extends StatelessWidget {
                           Builder(
                             builder: (context) {
                               final s = suggestions[i];
-                              final q = s.cheapestQuote(s.defaultVariantIndex);
+                              final q = s.cheapestQuote(
+                                s.defaultVariantIndex,
+                                enabledRetailers: state.enabledRetailers,
+                              );
                               return SastaCard(
                                 color: palette.pastel(s.pastel),
                                 shadow: false,
@@ -1148,6 +1193,7 @@ class BasketScreen extends StatelessWidget {
                                             child: ProductArtTile(
                                               kind: s.artKind,
                                               pastel: s.pastel,
+                                              imageUrl: s.bestImageUrl,
                                               size: 56,
                                             ),
                                           ),
@@ -1285,16 +1331,17 @@ class BasketScreen extends StatelessWidget {
             ],
           ),
         ),
-        Positioned(
-          left: 0,
-          right: 0,
-          bottom: SastaSizes.navHeight + 24,
-          child: BasketFloatingBar(
-            productCount: basket.uniqueProducts,
-            estimateTotal: cheapestTotal,
-            onCompare: () => SastaNav.openBasketCompare(context),
+        if (!state.basketOfflineError)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: SastaSizes.navHeight + 24,
+            child: BasketFloatingBar(
+              productCount: basket.uniqueProducts,
+              estimateTotal: cheapestTotal,
+              onCompare: () => SastaNav.openBasketCompare(context),
+            ),
           ),
-        ),
       ],
     );
   }
@@ -1394,7 +1441,10 @@ class _EmptyBasketView extends StatelessWidget {
                     Builder(
                       builder: (context) {
                         final p = state.products[i];
-                        final q = p.cheapestQuote(p.defaultVariantIndex);
+                        final q = p.cheapestQuote(
+                          p.defaultVariantIndex,
+                          enabledRetailers: state.enabledRetailers,
+                        );
                         return SastaCard(
                           color: context.sasta.pastel(p.pastel),
                           shadow: false,
@@ -1409,6 +1459,7 @@ class _EmptyBasketView extends StatelessWidget {
                                     ProductArtTile(
                                       kind: p.artKind,
                                       pastel: p.pastel,
+                                      imageUrl: p.bestImageUrl,
                                       size: 44,
                                     ),
                                     const Spacer(),

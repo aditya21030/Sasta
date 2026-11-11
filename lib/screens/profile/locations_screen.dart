@@ -54,116 +54,162 @@ class _LocationsScreenState extends State<LocationsScreen> {
     final areaCtrl = TextEditingController(text: existing?.area ?? '');
     var makeDefault = existing?.isDefault ?? true;
     var lookingUpPin = false;
+    double? resolvedLat = existing?.lat;
+    double? resolvedLng = existing?.lng;
+    String? modalError;
 
-    await showSastaSheet(
-      context: context,
-      builder: (ctx) {
-        final palette = ctx.sasta;
-        return StatefulBuilder(
-          builder: (ctx, setModalState) {
-            Future<void> handlePinChanged(String value) async {
-              final trimmed = value.trim();
-              if (!PincodeLocationService.isValidPincode(trimmed)) return;
-              setModalState(() => lookingUpPin = true);
-              final resolved = await state.locationService.lookupPincode(trimmed);
-              if (!ctx.mounted) return;
-              setModalState(() => lookingUpPin = false);
-              if (resolved != null && pinCtrl.text.trim() == trimmed) {
-                areaCtrl.text = resolved.displayArea;
+    try {
+      await showSastaSheet(
+        context: context,
+        builder: (ctx) {
+          final palette = ctx.sasta;
+          return StatefulBuilder(
+            builder: (ctx, setModalState) {
+              Future<void> handlePinChanged(String value) async {
+                final trimmed = value.trim();
+                if (modalError != null) {
+                  setModalState(() => modalError = null);
+                }
+                if (existing == null || trimmed != existing.pincode) {
+                  resolvedLat = null;
+                  resolvedLng = null;
+                }
+                if (!PincodeLocationService.isValidPincode(trimmed)) return;
+                setModalState(() => lookingUpPin = true);
+                final resolved =
+                    await state.locationService.lookupPincode(trimmed);
+                if (!ctx.mounted) return;
+                setModalState(() => lookingUpPin = false);
+                if (resolved != null && pinCtrl.text.trim() == trimmed) {
+                  areaCtrl.text = resolved.displayArea;
+                  resolvedLat = resolved.lat;
+                  resolvedLng = resolved.lng;
+                }
               }
-            }
 
-            return Padding(
-              padding: const EdgeInsets.fromLTRB(22, 14, 22, 28),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    existing == null ? 'Add new location' : 'Edit location',
-                    style: SastaText.display(ctx, size: 22),
-                  ),
-                  const SizedBox(height: 14),
-                  _ModalField(controller: labelCtrl, hint: 'Label (e.g. Home, Work)'),
-                  const SizedBox(height: 10),
-                  _ModalField(
-                    controller: pinCtrl,
-                    hint: '6-digit pincode',
-                    digitsOnly: true,
-                    maxLength: 6,
-                    onChanged: (v) => unawaited(handlePinChanged(v)),
-                  ),
-                  const SizedBox(height: 10),
-                  _ModalField(
-                    controller: areaCtrl,
-                    hint: lookingUpPin
-                        ? 'Looking up area via India Post…'
-                        : 'City / Area',
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          'Set as default delivery address',
-                          style: SastaText.body(
-                            ctx,
-                            size: 14,
-                            weight: FontWeight.w600,
-                            color: palette.ink,
-                          ),
+              return Padding(
+                padding: const EdgeInsets.fromLTRB(22, 14, 22, 28),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      existing == null ? 'Add new location' : 'Edit location',
+                      style: SastaText.display(ctx, size: 22),
+                    ),
+                    const SizedBox(height: 14),
+                    _ModalField(
+                      controller: labelCtrl,
+                      hint: 'Label (e.g. Home, Work)',
+                    ),
+                    const SizedBox(height: 10),
+                    _ModalField(
+                      controller: pinCtrl,
+                      hint: '6-digit pincode',
+                      digitsOnly: true,
+                      maxLength: 6,
+                      onChanged: (v) => unawaited(handlePinChanged(v)),
+                    ),
+                    const SizedBox(height: 10),
+                    _ModalField(
+                      controller: areaCtrl,
+                      hint: lookingUpPin
+                          ? 'Looking up area via India Post…'
+                          : 'City / Area',
+                    ),
+                    if (modalError != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        modalError!,
+                        style: SastaText.body(
+                          ctx,
+                          size: 13,
+                          color: palette.dangerText,
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      SastaSwitch(
-                        value: makeDefault,
-                        onChanged: (v) => setModalState(() => makeDefault = v),
-                      ),
                     ],
-                  ),
-                  const SizedBox(height: 16),
-                  SastaPrimaryButton(
-                    label: existing == null ? 'Save location' : 'Update location',
-                    onPressed: () {
-                      final pin = pinCtrl.text.trim();
-                      if (pin.length != 6) {
-                        showSastaToast(context, 'Enter a valid 6-digit pincode');
-                        return;
-                      }
-                      final label = labelCtrl.text.trim().isEmpty
-                          ? 'Saved place'
-                          : labelCtrl.text.trim();
-                      final area = areaCtrl.text.trim().isEmpty
-                          ? 'India'
-                          : areaCtrl.text.trim();
-                      if (existing == null) {
-                        state.addLocation(
-                          label: label,
-                          pincode: pin,
-                          area: area,
-                          makeDefault: makeDefault,
-                        );
-                      } else {
-                        state.updateLocation(
-                          existing.copyWith(
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Set as default delivery address',
+                            style: SastaText.body(
+                              ctx,
+                              size: 14,
+                              weight: FontWeight.w600,
+                              color: palette.ink,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        SastaSwitch(
+                          value: makeDefault,
+                          onChanged: (v) =>
+                              setModalState(() => makeDefault = v),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    SastaPrimaryButton(
+                      label: existing == null
+                          ? 'Save location'
+                          : 'Update location',
+                      onPressed: () {
+                        final pin = pinCtrl.text.trim();
+                        if (!PincodeLocationService.isValidPincode(pin)) {
+                          setModalState(
+                            () => modalError =
+                                'Enter a valid 6-digit Indian pincode',
+                          );
+                          return;
+                        }
+                        final label = labelCtrl.text.trim().isEmpty
+                            ? 'Saved place'
+                            : labelCtrl.text.trim();
+                        final area = areaCtrl.text.trim().isEmpty
+                            ? 'India'
+                            : areaCtrl.text.trim();
+                        if (existing == null) {
+                          state.addLocation(
                             label: label,
                             pincode: pin,
                             area: area,
-                            isDefault: makeDefault,
-                          ),
-                        );
-                        if (makeDefault) state.setDefaultLocation(existing.id);
-                      }
-                      Navigator.of(ctx).pop();
-                    },
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
+                            lat: resolvedLat,
+                            lng: resolvedLng,
+                            makeDefault: makeDefault,
+                          );
+                        } else {
+                          state.updateLocation(
+                            SavedLocation(
+                              id: existing.id,
+                              label: label,
+                              pincode: pin,
+                              area: area,
+                              isDefault: makeDefault,
+                              lat: resolvedLat,
+                              lng: resolvedLng,
+                            ),
+                          );
+                          if (makeDefault) {
+                            state.setDefaultLocation(existing.id);
+                          }
+                        }
+                        Navigator.of(ctx).pop();
+                      },
+                    ),
+                  ],
+                ),
+              );
+            },
+          );
+        },
+      );
+    } finally {
+      labelCtrl.dispose();
+      pinCtrl.dispose();
+      areaCtrl.dispose();
+    }
   }
 
   @override

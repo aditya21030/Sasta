@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../app/sasta_routes.dart';
 import '../../data/sasta_app_state.dart';
+import '../../models/models.dart';
 import '../../theme/sasta_theme.dart';
 import '../../theme/sasta_tokens.dart';
 import '../../widgets/product_art.dart';
@@ -17,15 +18,17 @@ class BasketSelectScreen extends StatefulWidget {
 }
 
 class _BasketSelectScreenState extends State<BasketSelectScreen> {
-  final Set<String> _selectedIds = {};
+  final Set<String> _selectedKeys = {};
   bool _initialized = false;
+
+  static String _entryKey(BasketEntry e) => '${e.productId}:${e.variantIndex}';
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (!_initialized) {
       final entries = SastaScope.read(context).activeBasket.entries;
-      _selectedIds.addAll(entries.take(3).map((e) => e.productId));
+      _selectedKeys.addAll(entries.take(3).map(_entryKey));
       _initialized = true;
     }
   }
@@ -35,10 +38,12 @@ class _BasketSelectScreenState extends State<BasketSelectScreen> {
     final state = SastaScope.of(context);
     final palette = context.sasta;
     final entries = state.activeBasket.entries;
+    final validKeys = entries.map(_entryKey).toSet();
+    _selectedKeys.retainAll(validKeys);
     final allSelected =
-        entries.isNotEmpty && _selectedIds.length == entries.length;
+        entries.isNotEmpty && _selectedKeys.length == entries.length;
     final selectedEntries =
-        entries.where((e) => _selectedIds.contains(e.productId)).toList();
+        entries.where((e) => _selectedKeys.contains(_entryKey(e))).toList();
     final selectedCount = selectedEntries.length;
     final selectedItemsCount =
         selectedEntries.fold(0, (s, e) => s + e.quantity);
@@ -65,9 +70,9 @@ class _BasketSelectScreenState extends State<BasketSelectScreen> {
                   trailing: TextButton(
                     onPressed: () => setState(() {
                       if (allSelected) {
-                        _selectedIds.clear();
+                        _selectedKeys.clear();
                       } else {
-                        _selectedIds.addAll(entries.map((e) => e.productId));
+                        _selectedKeys.addAll(entries.map(_entryKey));
                       }
                     }),
                     child: Text(
@@ -97,7 +102,8 @@ class _BasketSelectScreenState extends State<BasketSelectScreen> {
                     final e = entries[i];
                     final p = state.productById(e.productId);
                     if (p == null) return const SizedBox.shrink();
-                    final checked = _selectedIds.contains(e.productId);
+                    final key = _entryKey(e);
+                    final checked = _selectedKeys.contains(key);
                     final cheapest = p.cheapestQuote(
                       e.variantIndex,
                       enabledRetailers: state.enabledRetailers,
@@ -105,9 +111,9 @@ class _BasketSelectScreenState extends State<BasketSelectScreen> {
                     return SastaCard(
                       onTap: () => setState(() {
                         if (checked) {
-                          _selectedIds.remove(e.productId);
+                          _selectedKeys.remove(key);
                         } else {
-                          _selectedIds.add(e.productId);
+                          _selectedKeys.add(key);
                         }
                       }),
                       border: Border.all(
@@ -143,6 +149,7 @@ class _BasketSelectScreenState extends State<BasketSelectScreen> {
                           ProductArtTile(
                             kind: p.artKind,
                             pastel: p.pastel,
+                            imageUrl: p.bestImageUrl,
                             size: 52,
                           ),
                           const SizedBox(width: 12),
@@ -220,27 +227,40 @@ class _BasketSelectScreenState extends State<BasketSelectScreen> {
                         _ActionCircle(
                           icon: Icons.favorite_border_rounded,
                           tooltip: 'Save selected to Favourites',
-                          onTap: () {
-                            for (final id in _selectedIds) {
-                              if (!state.isFavourite(id)) {
-                                state.toggleFavourite(id);
-                              }
-                            }
-                            showSastaToast(
-                              context,
-                              'Added $selectedCount items to Saved',
-                            );
-                          },
+                          onTap: selectedEntries.isEmpty
+                              ? null
+                              : () {
+                                  for (final entry in selectedEntries) {
+                                    if (!state.isFavourite(entry.productId)) {
+                                      state.toggleFavourite(entry.productId);
+                                    }
+                                  }
+                                  showSastaToast(
+                                    context,
+                                    'Added $selectedCount items to Saved',
+                                  );
+                                },
                         ),
                         const SizedBox(width: 8),
                         _ActionCircle(
                           icon: Icons.delete_outline_rounded,
                           tooltip: 'Remove selected',
-                          onTap: () {
-                            state.removeBasketItems(_selectedIds);
-                            Navigator.of(context).pop();
-                            showSastaToast(context, 'Removed selected items');
-                          },
+                          onTap: selectedEntries.isEmpty
+                              ? null
+                              : () {
+                                  for (final entry in selectedEntries) {
+                                    state.updateBasketItemQuantity(
+                                      entry.productId,
+                                      0,
+                                      variantIndex: entry.variantIndex,
+                                    );
+                                  }
+                                  Navigator.of(context).pop();
+                                  showSastaToast(
+                                    context,
+                                    'Removed $selectedCount selected item${selectedCount == 1 ? '' : 's'}',
+                                  );
+                                },
                         ),
                       ],
                     ),
@@ -280,24 +300,28 @@ class _ActionCircle extends StatelessWidget {
 
   final IconData icon;
   final String tooltip;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
+    final enabled = onTap != null;
     return Tooltip(
       message: tooltip,
-      child: InkWell(
-        onTap: onTap,
-        customBorder: const CircleBorder(),
-        child: Container(
-          width: 42,
-          height: 42,
-          decoration: const BoxDecoration(
-            color: Color(0xFF2E2E2E),
-            shape: BoxShape.circle,
+      child: Opacity(
+        opacity: enabled ? 1.0 : 0.42,
+        child: InkWell(
+          onTap: onTap,
+          customBorder: const CircleBorder(),
+          child: Container(
+            width: 42,
+            height: 42,
+            decoration: const BoxDecoration(
+              color: Color(0xFF2E2E2E),
+              shape: BoxShape.circle,
+            ),
+            alignment: Alignment.center,
+            child: Icon(icon, size: 20, color: Colors.white),
           ),
-          alignment: Alignment.center,
-          child: Icon(icon, size: 20, color: Colors.white),
         ),
       ),
     );

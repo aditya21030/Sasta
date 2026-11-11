@@ -49,10 +49,18 @@ Future<void> showCreatePriceAlertSheet(
 }) async {
   final state = SastaScope.read(context);
   final product = initialProduct ??
-      state.productById('amul_milk')!;
+      state.productById('amul_milk') ??
+      state.products.firstOrNull;
+  if (product == null) {
+    showSastaToast(context, 'No products available for an alert');
+    return;
+  }
   final cheapest = product.cheapestQuote(product.defaultVariantIndex);
   final currentPrice = cheapest?.price ?? 30;
-  var target = (currentPrice - 2).clamp(1, currentPrice);
+  final sliderMax = currentPrice < 2 ? 2.0 : currentPrice.toDouble();
+  final sliderMin =
+      (sliderMax * 0.65).floorToDouble().clamp(1.0, sliderMax - 1.0);
+  var target = (currentPrice - 2).clamp(sliderMin.round(), sliderMax.round());
 
   await showSastaSheet(
     context: context,
@@ -95,6 +103,7 @@ Future<void> showCreatePriceAlertSheet(
                       ProductArtTile(
                         kind: product.artKind,
                         pastel: product.pastel,
+                        imageUrl: product.bestImageUrl,
                         size: 52,
                       ),
                       const SizedBox(width: 12),
@@ -142,10 +151,9 @@ Future<void> showCreatePriceAlertSheet(
                 ),
                 Slider(
                   value: target.toDouble(),
-                  min: (currentPrice * 0.65).floorToDouble().clamp(1, 5000),
-                  max: currentPrice.toDouble(),
-                  divisions: (currentPrice - (currentPrice * 0.65).floor())
-                      .clamp(1, 50),
+                  min: sliderMin,
+                  max: sliderMax,
+                  divisions: (sliderMax - sliderMin).round().clamp(1, 50),
                   activeColor: SastaColors.accent,
                   onChanged: (v) => setState(() => target = v.round()),
                 ),
@@ -177,8 +185,11 @@ Future<void> showRetailerHandoffSheet(
   required int estimatedAmount,
   String? itemLabel,
   String? searchQuery,
+  String? productUrl,
+  String? etaOverride,
 }) async {
   final state = SastaScope.read(context);
+  final etaText = etaOverride ?? state.etaFor(retailer);
   await showSastaSheet(
     context: context,
     builder: (ctx) {
@@ -242,15 +253,18 @@ Future<void> showRetailerHandoffSheet(
                 final outcome = await state.retailerLauncher.openRetailer(
                   retailer,
                   query: searchQuery ?? itemLabel,
+                  productUrl: productUrl,
                 );
-                await Clipboard.setData(
-                  ClipboardData(text: outcome.targetUri.toString()),
-                );
+                if (!outcome.launched) {
+                  await Clipboard.setData(
+                    ClipboardData(text: outcome.targetUri.toString()),
+                  );
+                }
                 if (!context.mounted) return;
                 showSastaToast(
                   context,
                   outcome.launched
-                      ? 'Opening ${retailer.name} (${retailer.eta})'
+                      ? 'Opening ${retailer.name} ($etaText)'
                       : 'Link copied for ${retailer.name}: ${outcome.targetUri}',
                 );
               },
@@ -264,6 +278,16 @@ Future<void> showRetailerHandoffSheet(
 
 /// Interactive Savings Breakdown Sheet referenced from "Full report" / "Monthly savings report".
 Future<void> showMonthlySavingsSheet(BuildContext context) async {
+  final state = SastaScope.read(context);
+  final comp = state.computeBasketComparison();
+  final weeklySavings = comp.savingsVsPriciest;
+  final monthlyEstimate = weeklySavings * 4;
+  final storeRows = comp.storeTotals
+      .where((s) => s.availableCount > 0)
+      .toList()
+    ..sort((a, b) => a.totalPrice.compareTo(b.totalPrice));
+  final maxTotal = storeRows.isEmpty ? 0 : storeRows.last.totalPrice;
+
   await showSastaSheet(
     context: context,
     builder: (ctx) {
@@ -291,7 +315,7 @@ Future<void> showMonthlySavingsSheet(BuildContext context) async {
             ),
             const SizedBox(height: 4),
             Text(
-              'Estimated, not confirmed purchases',
+              'Estimated from ${state.activeBasket.name} (${state.activeBasket.uniqueProducts} items)',
               style: SastaText.muted(ctx, size: 13),
             ),
             const SizedBox(height: 14),
@@ -308,7 +332,7 @@ Future<void> showMonthlySavingsSheet(BuildContext context) async {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Nov estimated savings',
+                          'Monthly basket savings (~4×/mo)',
                           style: SastaText.body(
                             ctx,
                             size: 13,
@@ -317,13 +341,15 @@ Future<void> showMonthlySavingsSheet(BuildContext context) async {
                           ),
                         ),
                         const SizedBox(height: 2),
-                        const FittedBox(
+                        FittedBox(
                           fit: BoxFit.scaleDown,
                           alignment: Alignment.centerLeft,
-                          child: PriceGradientText('₹312', size: 42),
+                          child: PriceGradientText('₹$monthlyEstimate', size: 42),
                         ),
                         Text(
-                          '16% higher than Oct (₹268)',
+                          weeklySavings > 0
+                              ? '₹$weeklySavings saved per basket (${comp.percentSavedVsPriciest}%) · ${state.priceAlerts.length} alerts active'
+                              : '${state.priceAlerts.length} price alerts active across ${state.enabledRetailers.length} stores',
                           style: SastaText.body(
                             ctx,
                             size: 12,
@@ -343,22 +369,27 @@ Future<void> showMonthlySavingsSheet(BuildContext context) async {
               ),
             ),
             const SizedBox(height: 14),
-            const _SavingsBarRow(label: 'Zepto (14 wins)', value: '₹148', ratio: 0.9),
-            const SizedBox(height: 8),
-            const _SavingsBarRow(label: 'Blinkit (9 wins)', value: '₹94', ratio: 0.58),
-            const SizedBox(height: 8),
-            const _SavingsBarRow(
-              label: 'Swiggy Instamart (4 wins)',
-              value: '₹46',
-              ratio: 0.3,
-            ),
-            const SizedBox(height: 8),
-            const _SavingsBarRow(
-              label: 'Flipkart Minutes (3 wins)',
-              value: '₹24',
-              ratio: 0.18,
-            ),
-            const SizedBox(height: 18),
+            if (storeRows.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Text(
+                  'Add items to your active basket to see store-by-store total comparisons.',
+                  style: SastaText.muted(ctx, size: 13),
+                ),
+              )
+            else
+              for (final row in storeRows) ...[
+                _SavingsBarRow(
+                  label:
+                      '${row.retailer.name} (${row.availableCount}/${row.totalProducts} items)',
+                  value: '₹${row.totalPrice}',
+                  ratio: maxTotal > 0
+                      ? (row.totalPrice / maxTotal).clamp(0.08, 1.0)
+                      : 0.0,
+                ),
+                const SizedBox(height: 8),
+              ],
+            const SizedBox(height: 10),
             SastaPrimaryButton(
               label: 'Done',
               onPressed: () => Navigator.of(ctx).pop(),

@@ -124,10 +124,38 @@ class SecurityScreen extends StatelessWidget {
                   label: 'Delete account',
                   borderColor: palette.dangerText,
                   textColor: palette.dangerText,
-                  onPressed: () {
-                    state.logOut();
+                  onPressed: () async {
+                    final confirmed = await showDialog<bool>(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        title: Text(
+                          'Delete account?',
+                          style: SastaText.display(ctx, size: 22),
+                        ),
+                        content: Text(
+                          'This deletes your local baskets, alerts, locations, and profile data on this device.',
+                          style: SastaText.muted(ctx, size: 14),
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(ctx).pop(false),
+                            child: const Text('Cancel'),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.of(ctx).pop(true),
+                            style: TextButton.styleFrom(
+                              foregroundColor: palette.dangerText,
+                            ),
+                            child: const Text('Delete'),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirmed != true || !context.mounted) return;
+                    await state.deleteAccount();
+                    if (!context.mounted) return;
                     Navigator.of(context).popUntil((r) => r.isFirst);
-                    showSastaToast(context, 'Account deletion initiated');
+                    showSastaToast(context, 'Account deleted from this device');
                   },
                 ),
               ],
@@ -138,34 +166,64 @@ class SecurityScreen extends StatelessWidget {
     );
   }
 
-  void _openPasswordSheet(BuildContext context) {
+  Future<void> _openPasswordSheet(BuildContext context) async {
     final controller = TextEditingController();
-    showSastaSheet(
-      context: context,
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.fromLTRB(22, 16, 22, 28),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text('Change password', style: SastaText.display(ctx, size: 22)),
-            const SizedBox(height: 12),
-            SastaSearchPill(
-              controller: controller,
-              hintText: 'Enter new password',
-              showMic: false,
+    String? modalError;
+    try {
+      await showSastaSheet(
+        context: context,
+        builder: (ctx) => StatefulBuilder(
+          builder: (ctx, setModalState) => Padding(
+            padding: const EdgeInsets.fromLTRB(22, 16, 22, 28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text('Change password', style: SastaText.display(ctx, size: 22)),
+                const SizedBox(height: 12),
+                SastaSearchPill(
+                  controller: controller,
+                  hintText: 'Enter new password (min 6 chars)',
+                  showMic: false,
+                  onChanged: (_) {
+                    if (modalError != null) {
+                      setModalState(() => modalError = null);
+                    }
+                  },
+                ),
+                if (modalError != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    modalError!,
+                    style: SastaText.body(
+                      ctx,
+                      size: 13,
+                      color: ctx.sasta.dangerText,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 16),
+                SastaPrimaryButton(
+                  label: 'Update password',
+                  onPressed: () {
+                    if (controller.text.trim().length < 6) {
+                      setModalState(
+                        () => modalError =
+                            'Password must be at least 6 characters',
+                      );
+                      return;
+                    }
+                    Navigator.of(ctx).pop();
+                    showSastaToast(context, 'Password updated');
+                  },
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            SastaPrimaryButton(
-              label: 'Update password',
-              onPressed: () {
-                Navigator.of(ctx).pop();
-                showSastaToast(context, 'Password updated');
-              },
-            ),
-          ],
+          ),
         ),
-      ),
-    );
+      );
+    } finally {
+      controller.dispose();
+    }
   }
 }

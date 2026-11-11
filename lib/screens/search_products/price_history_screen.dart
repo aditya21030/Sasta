@@ -29,7 +29,10 @@ class _PriceHistoryScreenState extends State<PriceHistoryScreen> {
       if (!mounted) return;
       final state = SastaScope.read(context);
       final pId = widget.args?.productId;
-      if (pId != null && state.isApiConfigured) {
+      if (pId != null &&
+          state.isApiConfigured &&
+          !state.onDemandLiveMode &&
+          !state.isLiveQuotaExhausted) {
         state.refreshProductDetails(pId);
       }
     });
@@ -41,11 +44,17 @@ class _PriceHistoryScreenState extends State<PriceHistoryScreen> {
     final palette = context.sasta;
     final product = state.productById(widget.args?.productId ?? 'amul_milk') ??
         state.products.first;
-    final vIdx = widget.args?.variantIndex ?? product.defaultVariantIndex;
+    final rawVariant = widget.args?.variantIndex ?? product.defaultVariantIndex;
+    final vIdx = rawVariant.clamp(0, product.variants.length - 1);
     final variant = product.variantAt(vIdx);
-    final cheapest = product.cheapestQuote(vIdx);
+    final cheapest = product.cheapestQuote(
+      vIdx,
+      enabledRetailers: state.enabledRetailers,
+    );
     final series = product.historyByRange[_range] ??
-        product.historyByRange.values.first;
+        (product.historyByRange.isNotEmpty
+            ? product.historyByRange.values.first
+            : null);
 
     return Scaffold(
       body: SastaBackground(
@@ -71,6 +80,7 @@ class _PriceHistoryScreenState extends State<PriceHistoryScreen> {
                           ProductArtTile(
                             kind: product.artKind,
                             pastel: product.pastel,
+                            imageUrl: product.bestImageUrl,
                             size: 60,
                           ),
                           const SizedBox(width: 12),
@@ -115,43 +125,64 @@ class _PriceHistoryScreenState extends State<PriceHistoryScreen> {
                         }).toList(),
                       ),
                       const SizedBox(height: 16),
-                      AnimatedPriceLineChart(
-                        primaryPoints: series.primaryPoints,
-                        secondaryPoints: series.secondaryPoints,
-                        startLabel: series.startLabel,
-                        endLabel: series.endLabel,
-                      ),
-                      const SizedBox(height: 18),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _StatCol(
-                              label: 'Lowest',
-                              value: '₹${series.lowest}',
-                              color: palette.successText,
-                            ),
+                      if (series == null)
+                        SastaCard(
+                          color: palette.field,
+                          shadow: false,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'No price history recorded yet',
+                                style: SastaText.display(context, size: 18),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                'Live items start building price charts as you check them across pincodes.',
+                                style: SastaText.muted(context, size: 13),
+                              ),
+                            ],
                           ),
-                          Expanded(
-                            child: _StatCol(
-                              label: 'Highest',
-                              value: '₹${series.highest}',
-                              color: palette.pinkText,
+                        )
+                      else ...[
+                        AnimatedPriceLineChart(
+                          primaryPoints: series.primaryPoints,
+                          secondaryPoints: series.secondaryPoints,
+                          startLabel: series.startLabel,
+                          endLabel: series.endLabel,
+                        ),
+                        const SizedBox(height: 18),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _StatCol(
+                                label: 'Lowest',
+                                value: '₹${series.lowest}',
+                                color: palette.successText,
+                              ),
                             ),
-                          ),
-                          Expanded(
-                            child: _StatCol(
-                              label: 'Average',
-                              value: '₹${series.average.toStringAsFixed(1)}',
-                              color: palette.ink,
+                            Expanded(
+                              child: _StatCol(
+                                label: 'Highest',
+                                value: '₹${series.highest}',
+                                color: palette.pinkText,
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-                      Text(
-                        'Sample data · ${series.startLabel.toLowerCase()} to today · tap chart points to inspect.',
-                        style: SastaText.muted(context, size: 12),
-                      ),
+                            Expanded(
+                              child: _StatCol(
+                                label: 'Average',
+                                value: '₹${series.average.toStringAsFixed(1)}',
+                                color: palette.ink,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        Text(
+                          'Sample data · ${series.startLabel.toLowerCase()} to today · tap chart points to inspect.',
+                          style: SastaText.muted(context, size: 12),
+                        ),
+                      ],
                     ],
                   ),
                 ),

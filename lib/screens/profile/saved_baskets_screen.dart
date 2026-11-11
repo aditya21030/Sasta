@@ -94,6 +94,7 @@ class SavedBasketsScreen extends StatelessWidget {
                                     ProductArtTile(
                                       kind: p!.artKind,
                                       pastel: p.pastel,
+                                      imageUrl: p.bestImageUrl,
                                       size: 40,
                                       borderRadius: 12,
                                     ),
@@ -109,12 +110,21 @@ class SavedBasketsScreen extends StatelessWidget {
                                     alignment: Alignment.centerLeft,
                                     child: SastaChip(
                                       label: 'Compare',
-                                      selected: true,
+                                      selected: basket.entries.isNotEmpty,
                                       height: 40,
-                                      onTap: () => SastaNav.openBasketCompare(
-                                        context,
-                                        customEntries: basket.entries,
-                                      ),
+                                      onTap: () {
+                                        if (basket.entries.isEmpty) {
+                                          showSastaToast(
+                                            context,
+                                            'Add items to compare this basket',
+                                          );
+                                          return;
+                                        }
+                                        SastaNav.openBasketCompare(
+                                          context,
+                                          customEntries: basket.entries,
+                                        );
+                                      },
                                     ),
                                   ),
                                 ),
@@ -145,13 +155,73 @@ class SavedBasketsScreen extends StatelessWidget {
                                     const SizedBox(width: 6),
                                     _MiniActionCircle(
                                       icon: Icons.delete_outline_rounded,
-                                      tooltip: 'Delete basket',
+                                      tooltip: state.savedBaskets.length <= 1
+                                          ? 'Clear basket'
+                                          : 'Delete basket',
                                       iconColor: palette.dangerText,
-                                      onTap: () {
+                                      onTap: () async {
+                                        final isLast =
+                                            state.savedBaskets.length <= 1;
+                                        if (isLast && basket.entries.isEmpty) {
+                                          showSastaToast(
+                                            context,
+                                            'Basket is already empty',
+                                          );
+                                          return;
+                                        }
+                                        final confirmed =
+                                            await showDialog<bool>(
+                                          context: context,
+                                          builder: (ctx) => AlertDialog(
+                                            title: Text(
+                                              isLast
+                                                  ? 'Clear "${basket.name}"?'
+                                                  : 'Delete "${basket.name}"?',
+                                              style: SastaText.display(
+                                                ctx,
+                                                size: 22,
+                                              ),
+                                            ),
+                                            content: Text(
+                                              isLast
+                                                  ? 'This removes all items from your remaining basket.'
+                                                  : 'This basket and its saved items will be removed.',
+                                              style: SastaText.muted(
+                                                ctx,
+                                                size: 14,
+                                              ),
+                                            ),
+                                            actions: [
+                                              TextButton(
+                                                onPressed: () =>
+                                                    Navigator.of(ctx)
+                                                        .pop(false),
+                                                child: const Text('Cancel'),
+                                              ),
+                                              TextButton(
+                                                onPressed: () =>
+                                                    Navigator.of(ctx).pop(true),
+                                                style: TextButton.styleFrom(
+                                                  foregroundColor:
+                                                      palette.dangerText,
+                                                ),
+                                                child: Text(
+                                                  isLast ? 'Clear' : 'Delete',
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                        if (confirmed != true ||
+                                            !context.mounted) {
+                                          return;
+                                        }
                                         state.deleteBasket(basket.id);
                                         showSastaToast(
                                           context,
-                                          'Basket removed',
+                                          isLast
+                                              ? 'Basket cleared'
+                                              : 'Basket removed',
                                         );
                                       },
                                     ),

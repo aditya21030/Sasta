@@ -120,15 +120,37 @@ class ProductGridCard extends StatelessWidget {
             child: SizedBox(
               height: 58,
               width: 58,
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: ClipRect(
-                  child: CustomPaint(
-                    size: const Size.square(56),
-                    painter: ProductArtPainter(kind: product.artKind),
-                  ),
-                ),
-              ),
+              child: product.bestImageUrl != null
+                  ? Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      padding: const EdgeInsets.all(4),
+                      clipBehavior: Clip.antiAlias,
+                      child: Image.network(
+                        product.bestImageUrl!,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, _, _) => FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: ClipRect(
+                            child: CustomPaint(
+                              size: const Size.square(52),
+                              painter: ProductArtPainter(kind: product.artKind),
+                            ),
+                          ),
+                        ),
+                      ),
+                    )
+                  : FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: ClipRect(
+                        child: CustomPaint(
+                          size: const Size.square(56),
+                          painter: ProductArtPainter(kind: product.artKind),
+                        ),
+                      ),
+                    ),
             ),
           ),
           const SizedBox(height: 6),

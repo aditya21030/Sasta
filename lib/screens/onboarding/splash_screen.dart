@@ -27,8 +27,22 @@ class _SplashScreenState extends State<SplashScreen>
     _dotsController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1200),
-    )..repeat();
+    );
     _advanceTimer = Timer(const Duration(milliseconds: 1650), _finish);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final disabled = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    if (disabled) {
+      if (_dotsController.isAnimating) {
+        _dotsController.stop();
+      }
+      _dotsController.value = 0.5;
+    } else if (!_dotsController.isAnimating) {
+      _dotsController.repeat();
+    }
   }
 
   void _finish() {

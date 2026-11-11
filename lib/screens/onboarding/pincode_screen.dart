@@ -27,10 +27,12 @@ class PincodeScreen extends StatefulWidget {
 class _PincodeScreenState extends State<PincodeScreen> {
   final TextEditingController _controller = TextEditingController();
   String? _errorText;
-  String _selectedArea = 'Central Delhi';
   bool _isSubmitting = false;
   bool _isDetecting = false;
   String? _resolvedHint;
+  double? _detectedLat;
+  double? _detectedLng;
+  String? _detectedPin;
 
   static const _quickPresets = [
     (pin: '110001', area: 'Central Delhi'),
@@ -52,7 +54,6 @@ class _PincodeScreenState extends State<PincodeScreen> {
     final preset = _quickPresets.where((p) => p.pin == text).firstOrNull;
     if (preset != null) {
       setState(() {
-        _selectedArea = preset.area;
         _resolvedHint = preset.area;
       });
     }
@@ -61,8 +62,10 @@ class _PincodeScreenState extends State<PincodeScreen> {
     if (!mounted || _controller.text.trim() != text) return;
     if (resolved != null) {
       setState(() {
-        _selectedArea = resolved.displayArea;
         _resolvedHint = resolved.displayArea;
+        _detectedLat = resolved.lat;
+        _detectedLng = resolved.lng;
+        _detectedPin = text;
       });
     }
   }
@@ -80,7 +83,7 @@ class _PincodeScreenState extends State<PincodeScreen> {
       '560001' => 'Bengaluru',
       '400001' => 'Mumbai',
       '110001' => 'Central Delhi',
-      _ => _resolvedHint ?? _selectedArea,
+      _ => _resolvedHint ?? 'Area $text',
     };
     ResolvedPincode? resolved;
     if (_resolvedHint == null) {
@@ -88,11 +91,17 @@ class _PincodeScreenState extends State<PincodeScreen> {
     }
     if (!mounted) return;
     final finalArea = resolved?.displayArea ?? presetArea;
+    final resolvedLat = resolved?.lat ?? (_detectedPin == text ? _detectedLat : null);
+    final resolvedLng = resolved?.lng ?? (_detectedPin == text ? _detectedLng : null);
     ScaffoldMessenger.maybeOf(context)?.clearSnackBars();
-    state.completePincode(text, area: finalArea);
+    state.completePincode(
+      text,
+      area: finalArea,
+      lat: resolvedLat,
+      lng: resolvedLng,
+    );
     setState(() {
       _isSubmitting = false;
-      _selectedArea = finalArea;
     });
     if (widget.isModalPicker && mounted) {
       Navigator.of(context).pop();
@@ -112,9 +121,14 @@ class _PincodeScreenState extends State<PincodeScreen> {
     final resolved = result.resolved;
     if (resolved != null) {
       setState(() {
-        _controller.text = resolved.pincode;
-        _selectedArea = resolved.displayArea;
+        _controller.value = TextEditingValue(
+          text: resolved.pincode,
+          selection: TextSelection.collapsed(offset: resolved.pincode.length),
+        );
         _resolvedHint = resolved.displayArea;
+        _detectedLat = resolved.lat;
+        _detectedLng = resolved.lng;
+        _detectedPin = resolved.pincode;
         _errorText = null;
       });
       showSastaToast(
@@ -132,48 +146,62 @@ class _PincodeScreenState extends State<PincodeScreen> {
   @override
   Widget build(BuildContext context) {
     final palette = context.sasta;
-    final state = SastaScope.read(context);
 
-    return Scaffold(
-      body: SastaBackground(
-        child: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(
-              SastaSpace.page,
-              14,
-              SastaSpace.page,
-              SastaSpace.bottomMargin,
-            ),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minHeight: MediaQuery.of(context).size.height - 96,
-              ),
-              child: IntrinsicHeight(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: SastaBackButton(
-                        onPressed: () {
-                          if (widget.isModalPicker) {
-                            Navigator.of(context).pop();
-                          } else if (Navigator.of(context).canPop()) {
-                            Navigator.of(context).pop();
-                          } else {
-                            SastaScope.read(context).reopenOnboarding();
-                          }
-                        },
-                      ),
+    return PopScope(
+      canPop: widget.isModalPicker || Navigator.of(context).canPop(),
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && !widget.isModalPicker) {
+          SastaScope.read(context).reopenOnboarding();
+        }
+      },
+      child: Scaffold(
+        body: SastaBackground(
+          child: SafeArea(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final compact = constraints.maxHeight < 860;
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(
+                    SastaSpace.page,
+                    14,
+                    SastaSpace.page,
+                    SastaSpace.bottomMargin,
+                  ),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: (constraints.maxHeight -
+                              14 -
+                              SastaSpace.bottomMargin)
+                          .clamp(0.0, double.infinity),
                     ),
-                    const SizedBox(height: 10),
-                    const Center(
-                      child: FloatBob(
-                        amplitude: 7,
-                        child: PincodePinIllustration(size: 205),
-                      ),
-                    ),
-                    const SizedBox(height: 22),
+                    child: IntrinsicHeight(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: SastaBackButton(
+                              onPressed: () {
+                                if (widget.isModalPicker) {
+                                  Navigator.of(context).pop();
+                                } else if (Navigator.of(context).canPop()) {
+                                  Navigator.of(context).pop();
+                                } else {
+                                  SastaScope.read(context).reopenOnboarding();
+                                }
+                              },
+                            ),
+                          ),
+                          SizedBox(height: compact ? 6 : 10),
+                          Center(
+                            child: FloatBob(
+                              amplitude: 7,
+                              child: PincodePinIllustration(
+                                size: compact ? 150 : 205,
+                              ),
+                            ),
+                          ),
+                          SizedBox(height: compact ? 14 : 22),
                     FadeUp(
                       child: Text(
                         'Where should we\ndeliver?',
@@ -216,8 +244,15 @@ class _PincodeScreenState extends State<PincodeScreen> {
                                 LengthLimitingTextInputFormatter(6),
                               ],
                               onChanged: (value) {
-                                if (_errorText != null) {
-                                  setState(() => _errorText = null);
+                                if (_errorText != null || _detectedPin != value) {
+                                  setState(() {
+                                    _errorText = null;
+                                    if (_detectedPin != value) {
+                                      _detectedLat = null;
+                                      _detectedLng = null;
+                                      _detectedPin = null;
+                                    }
+                                  });
                                 }
                                 unawaited(_lookupPreview(value));
                               },
@@ -295,9 +330,16 @@ class _PincodeScreenState extends State<PincodeScreen> {
                           label: '${preset.pin} · ${preset.area}',
                           selected: isSelected,
                           onTap: () => setState(() {
-                            _controller.text = preset.pin;
-                            _selectedArea = preset.area;
+                            _controller.value = TextEditingValue(
+                              text: preset.pin,
+                              selection: TextSelection.collapsed(
+                                offset: preset.pin.length,
+                              ),
+                            );
                             _resolvedHint = preset.area;
+                            _detectedLat = null;
+                            _detectedLng = null;
+                            _detectedPin = null;
                             _errorText = null;
                           }),
                         );
@@ -307,15 +349,7 @@ class _PincodeScreenState extends State<PincodeScreen> {
                     const SizedBox(height: 20),
                     SastaPrimaryButton(
                       label: _isSubmitting ? 'Checking pincode…' : 'Continue',
-                      onPressed: _isSubmitting
-                          ? null
-                          : () {
-                              if (_controller.text.trim().isEmpty &&
-                                  !widget.isModalPicker) {
-                                _controller.text = state.activeLocation.pincode;
-                              }
-                              _submit();
-                            },
+                      onPressed: _isSubmitting ? null : _submit,
                     ),
                     const SizedBox(height: 6),
                     Center(
@@ -350,6 +384,9 @@ class _PincodeScreenState extends State<PincodeScreen> {
                   ],
                 ),
               ),
+            ),
+            );
+              },
             ),
           ),
         ),

@@ -119,6 +119,7 @@ class _HomeSearchScreenState extends State<HomeSearchScreen> {
                           ProductArtTile(
                             kind: product.artKind,
                             pastel: product.pastel,
+                            imageUrl: product.bestImageUrl,
                             size: 56,
                           ),
                           const SizedBox(width: 12),

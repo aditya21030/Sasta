@@ -68,7 +68,7 @@ class PrivacyScreen extends StatelessWidget {
     _LegalSection(
       title: '7. Data deletion',
       body:
-          'You can remove saved locations, clear search history, or request permanent account deletion from Profile → Security & Privacy.',
+          'You can remove saved locations, clear search history, or delete all locally stored data from Profile → Account security.',
       icon: Icons.delete_outline_rounded,
       pastel: SastaPastel.lavender,
     ),
@@ -126,7 +126,7 @@ class TermsScreen extends StatelessWidget {
     _LegalSection(
       title: '6. Sasta+ subscription',
       body:
-          'Sasta+ unlocks extended price history, alerts, and multi-store basket splits. Sample pricing is shown and renewals can be managed anytime.',
+          'Sasta+ unlocks 90-day price history, unlimited price alerts, and unlimited live price checks. Plan renewals and cancellations can be managed anytime in Manage Sasta+.',
       icon: Icons.workspace_premium_outlined,
       pastel: SastaPastel.pink,
     ),
@@ -189,7 +189,7 @@ class _LegalDocumentScaffold extends StatelessWidget {
                 Text(heading, style: SastaText.display(context, size: 30)),
                 const SizedBox(height: 6),
                 Text(
-                  'Draft copy for legal review.',
+                  'How Sasta handles grocery comparison data and retailer handoffs.',
                   style: SastaText.muted(context, size: 14),
                 ),
                 const SizedBox(height: 10),

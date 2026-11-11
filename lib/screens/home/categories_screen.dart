@@ -87,11 +87,11 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                           crossAxisCount: 3,
                           mainAxisSpacing: 10,
                           crossAxisSpacing: 10,
-                          mainAxisExtent: 74 +
-                              34 *
+                          mainAxisExtent: 76 +
+                              42 *
                                   MediaQuery.textScalerOf(context)
                                       .scale(1.0)
-                                      .clamp(1.0, 2.0),
+                                      .clamp(1.0, 2.8),
                         ),
                         itemCount: filtered.length,
                         itemBuilder: (context, index) {
