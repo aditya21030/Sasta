@@ -26,7 +26,10 @@ import 'package:sasta/screens/sasta_plus/pay_success_screen.dart';
 import 'package:sasta/screens/sasta_plus/plus_landing_screen.dart';
 import 'package:sasta/screens/sasta_plus/sub_history_screen.dart';
 import 'package:sasta/screens/search_products/price_history_screen.dart';
+import 'package:sasta/screens/search_products/product_details_screen.dart';
 import 'package:sasta/screens/search_products/search_results_screen.dart';
+import 'package:sasta/widgets/product_art.dart';
+import 'package:sasta/widgets/product_grid_card.dart';
 import 'package:sasta/theme/sasta_theme.dart';
 import 'package:sasta/theme/sasta_tokens.dart';
 import 'package:sasta/services/local_storage_service.dart';
@@ -1429,6 +1432,127 @@ void main() {
       addTearDown(reloaded.dispose);
       expect(reloaded.hasSeenOnboarding, isFalse);
       expect(reloaded.invoices, isEmpty);
+    },
+  );
+
+  testWidgets(
+    'Product image containers fill card, tile, and details hero bounds',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      final state = onboardedState();
+      addTearDown(state.dispose);
+      final sample = state.products.first.copyWith(
+        imageUrl: 'https://cdn.example.com/milk.png',
+      );
+      final networkImages = find.byWidgetPredicate(
+        (w) => w is Image && w.image is NetworkImage,
+      );
+
+      await tester.pumpWidget(
+        SastaScope(
+          state: state,
+          child: MaterialApp(
+            theme: buildSastaTheme(Brightness.light),
+            home: Scaffold(
+              body: Column(
+                children: [
+                  ProductGridCard(width: 196, product: sample),
+                  ProductArtTile(
+                    kind: sample.artKind,
+                    pastel: sample.pastel,
+                    imageUrl: sample.imageUrl,
+                    size: 96,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final gridImageSize = tester.getSize(
+        find.descendant(
+          of: find.byType(ProductGridCard),
+          matching: networkImages,
+        ),
+      );
+      // 196 card - 24 horizontal padding = 172 width; full 106 showcase height.
+      expect(gridImageSize.width, 172);
+      expect(gridImageSize.height, 106);
+
+      final tileImageSize = tester.getSize(
+        find.descendant(
+          of: find.byType(ProductArtTile),
+          matching: networkImages,
+        ),
+      );
+      // 96 tile - 2px hairline border = 94x94 edge-to-edge fill.
+      expect(tileImageSize.width, 94);
+      expect(tileImageSize.height, 94);
+
+      // Verify ProductDetailsScreen hero image expands to the 204x204 card.
+      final repo = HttpQuickCommerceRepository(
+        config: _testQuickCommerceConfig,
+        client: MockClient((request) async {
+          if (request.url.path == '/v1/groupsearch') {
+            return http.Response(
+              jsonEncode({
+                'status': 'success',
+                'results': {
+                  'Zepto': [
+                    {
+                      'id': 'z_milk_1',
+                      'name': 'Aashirvaad Select Milk',
+                      'brand': 'Aashirvaad',
+                      'quantity': '500 ml',
+                      'mrp': 31,
+                      'offer_price': 22,
+                      'available': true,
+                      'deeplink': 'https://www.zepto.com/milk',
+                      'images': ['https://cdn.example.com/select_milk.jpg'],
+                      'platform': {'sla': '9 mins', 'open': true},
+                    },
+                  ],
+                },
+              }),
+              200,
+              headers: {'x-credits-remaining': '80'},
+            );
+          }
+          return http.Response('{}', 404);
+        }),
+      );
+      addTearDown(repo.dispose);
+      final liveState = SastaAppState(repository: repo)
+        ..completeSplash()
+        ..completeOnboarding()
+        ..completePincode('560102', area: 'HSR Layout');
+      addTearDown(liveState.dispose);
+
+      await liveState.searchProductsRemote('Aashirvaad Select Milk');
+      final fetched = liveState.products.firstWhere(
+        (p) => p.bestImageUrl != null,
+      );
+
+      await tester.pumpWidget(
+        SastaScope(
+          state: liveState,
+          child: MaterialApp(
+            theme: buildSastaTheme(Brightness.light),
+            home: ProductDetailsScreen(
+              args: ProductRouteArgs(productId: fetched.id),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final detailsHeroImageSize = tester.getSize(networkImages.first);
+      expect(detailsHeroImageSize.width, 204);
+      expect(detailsHeroImageSize.height, 204);
     },
   );
 }

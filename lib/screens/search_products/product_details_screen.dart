@@ -101,81 +101,97 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                           child: FittedBox(
                             fit: BoxFit.scaleDown,
                             child: SizedBox(
-                              width: 240,
-                              height: 210,
+                              width: 256,
+                              height: 228,
                               child: Stack(
                                 alignment: Alignment.center,
                                 clipBehavior: Clip.hardEdge,
                                 children: [
-                                Container(
-                                  width: 204,
-                                  height: 204,
-                                  decoration: BoxDecoration(
-                                    color: palette.lavender,
-                                    shape: BoxShape.circle,
+                                  Container(
+                                    width: 218,
+                                    height: 218,
+                                    decoration: BoxDecoration(
+                                      color: palette.lavender,
+                                      borderRadius: BorderRadius.circular(
+                                        product.bestImageUrl != null ? 44 : 109,
+                                      ),
+                                    ),
                                   ),
-                                ),
-                                Container(
-                                  width: 152,
-                                  height: 152,
-                                  clipBehavior: Clip.antiAlias,
-                                  decoration: BoxDecoration(
-                                    color: palette.isDark
-                                        ? palette.surface
-                                        : Colors.white,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  padding: const EdgeInsets.all(14),
-                                  alignment: Alignment.center,
-                                  child: product.bestImageUrl != null
-                                      ? Image.network(
-                                          product.bestImageUrl!,
-                                          fit: BoxFit.contain,
-                                          errorBuilder: (_, _, _) =>
-                                              CustomPaint(
-                                            size: const Size.square(102),
+                                  if (product.bestImageUrl != null)
+                                    Container(
+                                      width: 204,
+                                      height: 204,
+                                      clipBehavior: Clip.antiAlias,
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(36),
+                                        boxShadow: SastaShadows.float(context),
+                                      ),
+                                      child: Image.network(
+                                        product.bestImageUrl!,
+                                        width: double.infinity,
+                                        height: double.infinity,
+                                        fit: BoxFit.contain,
+                                        errorBuilder: (_, _, _) => Container(
+                                          color: palette.lavender,
+                                          alignment: Alignment.center,
+                                          child: CustomPaint(
+                                            size: const Size.square(128),
                                             painter: ProductArtPainter(
                                               kind: product.artKind,
                                             ),
                                           ),
-                                        )
-                                      : CustomPaint(
-                                          size: const Size.square(102),
-                                          painter: ProductArtPainter(
-                                            kind: product.artKind,
-                                          ),
                                         ),
-                                ),
-                                const Positioned(
-                                  right: 18,
-                                  top: 18,
-                                  child: CircleAvatar(
-                                    radius: 14,
-                                    backgroundColor: SastaColors.gold,
-                                    child: Icon(
-                                      Icons.bolt_rounded,
-                                      size: 16,
-                                      color: SastaColors.ink,
+                                      ),
+                                    )
+                                  else
+                                    Container(
+                                      width: 168,
+                                      height: 168,
+                                      decoration: BoxDecoration(
+                                        color: palette.isDark
+                                            ? palette.surface
+                                            : Colors.white,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      alignment: Alignment.center,
+                                      child: CustomPaint(
+                                        size: const Size.square(124),
+                                        painter: ProductArtPainter(
+                                          kind: product.artKind,
+                                        ),
+                                      ),
+                                    ),
+                                  const Positioned(
+                                    right: 10,
+                                    top: 8,
+                                    child: CircleAvatar(
+                                      radius: 14,
+                                      backgroundColor: SastaColors.gold,
+                                      child: Icon(
+                                        Icons.bolt_rounded,
+                                        size: 16,
+                                        color: SastaColors.ink,
+                                      ),
                                     ),
                                   ),
-                                ),
-                                const Positioned(
-                                  left: 20,
-                                  top: 32,
-                                  child: SastaSparkle(
-                                    size: 18,
-                                    color: SastaColors.sparkleOrange,
+                                  const Positioned(
+                                    left: 10,
+                                    top: 22,
+                                    child: SastaSparkle(
+                                      size: 18,
+                                      color: SastaColors.sparkleOrange,
+                                    ),
                                   ),
-                                ),
-                                const Positioned(
-                                  right: 26,
-                                  bottom: 24,
-                                  child: SastaSparkle(
-                                    size: 15,
-                                    color: SastaColors.zepto,
+                                  const Positioned(
+                                    right: 16,
+                                    bottom: 14,
+                                    child: SastaSparkle(
+                                      size: 15,
+                                      color: SastaColors.zepto,
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
                               ),
                             ),
                           ),

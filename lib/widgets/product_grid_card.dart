@@ -48,7 +48,7 @@ class ProductGridCard extends StatelessWidget {
 
     final cardContent = Container(
       width: width,
-      padding: const EdgeInsets.all(13),
+      padding: const EdgeInsets.all(12),
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: palette.pastel(product.pastel),
@@ -118,42 +118,50 @@ class ProductGridCard extends StatelessWidget {
           ],
           Center(
             child: SizedBox(
-              height: 58,
-              width: 58,
+              height: 106,
+              width: double.infinity,
               child: product.bestImageUrl != null
                   ? Container(
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(18),
                       ),
-                      padding: const EdgeInsets.all(4),
                       clipBehavior: Clip.antiAlias,
                       child: Image.network(
                         product.bestImageUrl!,
+                        width: double.infinity,
+                        height: double.infinity,
                         fit: BoxFit.contain,
-                        errorBuilder: (_, _, _) => FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: ClipRect(
-                            child: CustomPaint(
-                              size: const Size.square(52),
-                              painter: ProductArtPainter(kind: product.artKind),
+                        errorBuilder: (_, _, _) => Container(
+                          color: palette.pastel(product.pastel),
+                          alignment: Alignment.center,
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: ClipRect(
+                              child: CustomPaint(
+                                size: const Size.square(72),
+                                painter:
+                                    ProductArtPainter(kind: product.artKind),
+                              ),
                             ),
                           ),
                         ),
                       ),
                     )
-                  : FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: ClipRect(
-                        child: CustomPaint(
-                          size: const Size.square(56),
-                          painter: ProductArtPainter(kind: product.artKind),
+                  : Center(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: ClipRect(
+                          child: CustomPaint(
+                            size: const Size.square(76),
+                            painter: ProductArtPainter(kind: product.artKind),
+                          ),
                         ),
                       ),
                     ),
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           Text(
             product.name,
             maxLines: 2,

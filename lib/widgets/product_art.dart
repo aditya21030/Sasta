@@ -34,31 +34,33 @@ class ProductArtTile extends StatelessWidget {
         painter: ProductArtPainter(kind: kind),
       ),
     );
+    final hasImage = url != null && url.isNotEmpty;
+    final palette = context.sasta;
     return Container(
       width: size,
       height: size,
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        color: bg,
+        color: hasImage ? Colors.white : bg,
         borderRadius: BorderRadius.circular(radius),
+        border: hasImage
+            ? Border.all(
+                color: palette.divider.withValues(alpha: 0.7),
+                width: 1,
+              )
+            : null,
       ),
-      alignment: Alignment.center,
-      child: (url != null && url.isNotEmpty)
-          ? Container(
-              width: size,
-              height: size,
-              color: Colors.white,
-              padding: EdgeInsets.all(math.max(2, size * 0.08)),
-              child: Image.network(
-                url,
-                fit: BoxFit.contain,
-                errorBuilder: (_, _, _) => Center(
-                  child: Container(
-                    color: bg,
-                    alignment: Alignment.center,
-                    child: fallback,
-                  ),
-                ),
+      alignment: hasImage ? null : Alignment.center,
+      child: hasImage
+          ? Image.network(
+              url,
+              width: double.infinity,
+              height: double.infinity,
+              fit: BoxFit.contain,
+              errorBuilder: (_, _, _) => Container(
+                color: bg,
+                alignment: Alignment.center,
+                child: fallback,
               ),
             )
           : fallback,

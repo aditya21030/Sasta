@@ -379,8 +379,8 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                           crossAxisCount: 2,
                           mainAxisSpacing: 12,
                           crossAxisSpacing: 12,
-                          mainAxisExtent: 186 +
-                              52 *
+                          mainAxisExtent: 234 +
+                              54 *
                                   MediaQuery.textScalerOf(context)
                                       .scale(1.0)
                                       .clamp(1.0, 2.8),
