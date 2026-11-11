@@ -21,15 +21,21 @@ class HomeScreen extends StatelessWidget {
     final state = SastaScope.of(context);
     final palette = context.sasta;
 
-    return SingleChildScrollView(
-      physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(
-        SastaSpace.page,
-        14,
-        SastaSpace.page,
-        SastaSpace.navClearance,
-      ),
-      child: Column(
+    return RefreshIndicator(
+      onRefresh: () async {
+        await state.syncCatalogForLocation();
+      },
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: BouncingScrollPhysics(),
+        ),
+        padding: const EdgeInsets.fromLTRB(
+          SastaSpace.page,
+          14,
+          SastaSpace.page,
+          SastaSpace.navClearance,
+        ),
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // Top app bar: brand + pincode pill + notification bell
@@ -130,6 +136,54 @@ class HomeScreen extends StatelessWidget {
                 onTap: () => SastaNav.openHomeSearch(context),
               ),
             ),
+            if (state.isCatalogSyncing ||
+                state.isLiveCatalogActive ||
+                state.lastSyncError != null) ...[
+              const SizedBox(height: 10),
+              GestureDetector(
+                onTap: () =>
+                    SastaNav.push(context, SastaRouteNames.comparisonPrefs),
+                child: Row(
+                  children: [
+                    Icon(
+                      state.lastSyncError != null
+                          ? Icons.sync_problem_rounded
+                          : (state.isCatalogSyncing
+                              ? Icons.sync_rounded
+                              : Icons.cloud_done_rounded),
+                      size: 14,
+                      color: state.lastSyncError != null
+                          ? palette.dangerText
+                          : (state.isLiveCatalogActive
+                              ? palette.successText
+                              : palette.muted),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        state.isCatalogSyncing
+                            ? 'Syncing live prices for ${state.activeLocation.pincode}…'
+                            : (state.lastSyncError != null
+                                ? 'Live sync paused · showing cached prices'
+                                : 'Live API prices active · ${state.activeLocation.area}'),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: SastaText.body(
+                          context,
+                          size: 12,
+                          weight: FontWeight.w600,
+                          color: state.lastSyncError != null
+                              ? palette.dangerText
+                              : (state.isLiveCatalogActive
+                                  ? palette.successText
+                                  : palette.muted),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             if (state.firstTimeUserMode) ...[
               const SizedBox(height: 18),
               _WelcomeBannerCard(
@@ -231,6 +285,7 @@ class HomeScreen extends StatelessWidget {
           ],
         ],
       ),
+        ),
     );
   }
 }
@@ -460,7 +515,7 @@ class _BestDealsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final deals = MockCatalog.products.where((p) => p.isDeal).toList();
+    final deals = state.products.where((p) => p.isDeal).toList();
     return Column(
       children: [
         _SectionHeader(
@@ -509,7 +564,7 @@ class _TrendingSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final items = MockCatalog.products.where((p) => p.isTrending).toList();
+    final items = state.products.where((p) => p.isTrending).toList();
     return Column(
       children: [
         _SectionHeader(
@@ -552,7 +607,7 @@ class _PricesDroppedSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.sasta;
-    final drops = MockCatalog.products.where((p) => p.isPriceDrop).toList();
+    final drops = state.products.where((p) => p.isPriceDrop).toList();
     return Column(
       children: [
         _SectionHeader(

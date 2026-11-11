@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../app/sasta_routes.dart';
-import '../../data/mock_catalog.dart';
 import '../../data/sasta_app_state.dart';
 import '../../theme/sasta_theme.dart';
 import '../../theme/sasta_tokens.dart';
@@ -24,11 +23,24 @@ class _PriceHistoryScreenState extends State<PriceHistoryScreen> {
   static const _ranges = ['7D', '30D', '90D', 'All'];
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final state = SastaScope.read(context);
+      final pId = widget.args?.productId;
+      if (pId != null && state.isApiConfigured) {
+        state.refreshProductDetails(pId);
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final state = SastaScope.of(context);
     final palette = context.sasta;
     final product = state.productById(widget.args?.productId ?? 'amul_milk') ??
-        MockCatalog.products.first;
+        state.products.first;
     final vIdx = widget.args?.variantIndex ?? product.defaultVariantIndex;
     final variant = product.variantAt(vIdx);
     final cheapest = product.cheapestQuote(vIdx);

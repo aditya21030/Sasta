@@ -157,10 +157,19 @@ Future<void> showBasketShareSheet(BuildContext context) async {
                   icon: Icons.chat_bubble_outline_rounded,
                   bg: palette.mint,
                   fg: palette.successText,
-                  onTap: () {
-                    Clipboard.setData(ClipboardData(text: formattedText));
+                  onTap: () async {
                     Navigator.of(ctx).pop();
-                    showSastaToast(context, 'List copied for WhatsApp sharing');
+                    final ok = await state.shareService.shareToWhatsApp(
+                      formattedText,
+                      subject: '${basket.name} — Sasta',
+                    );
+                    if (!context.mounted) return;
+                    showSastaToast(
+                      context,
+                      ok
+                          ? 'Sharing ${basket.name} on WhatsApp'
+                          : 'List copied for WhatsApp sharing',
+                    );
                   },
                 ),
                 _ShareTile(
@@ -179,10 +188,17 @@ Future<void> showBasketShareSheet(BuildContext context) async {
                   icon: Icons.file_upload_outlined,
                   bg: palette.sky,
                   fg: palette.skyText,
-                  onTap: () {
-                    Clipboard.setData(ClipboardData(text: formattedText));
+                  onTap: () async {
                     Navigator.of(ctx).pop();
-                    showSastaToast(context, 'Exported text summary');
+                    final ok = await state.shareService.shareText(
+                      formattedText,
+                      subject: '${basket.name} — Sasta Basket',
+                    );
+                    if (!context.mounted) return;
+                    showSastaToast(
+                      context,
+                      ok ? 'Exported shopping list' : 'List copied for export',
+                    );
                   },
                 ),
                 _ShareTile(
@@ -190,9 +206,19 @@ Future<void> showBasketShareSheet(BuildContext context) async {
                   icon: Icons.print_outlined,
                   bg: palette.peach,
                   fg: palette.linkText,
-                  onTap: () {
+                  onTap: () async {
                     Navigator.of(ctx).pop();
-                    showSastaToast(context, 'Prepared print layout');
+                    final ok = await state.shareService.shareText(
+                      formattedText,
+                      subject: 'Print ${basket.name}',
+                    );
+                    if (!context.mounted) return;
+                    showSastaToast(
+                      context,
+                      ok
+                          ? 'Opened print & share options'
+                          : 'Print summary copied to clipboard',
+                    );
                   },
                 ),
               ],
@@ -201,10 +227,17 @@ Future<void> showBasketShareSheet(BuildContext context) async {
             SastaOutlineButton(
               label: 'More apps',
               height: 48,
-              onPressed: () {
-                Clipboard.setData(ClipboardData(text: formattedText));
+              onPressed: () async {
                 Navigator.of(ctx).pop();
-                showSastaToast(context, 'List copied for sharing');
+                final ok = await state.shareService.shareText(
+                  formattedText,
+                  subject: '${basket.name} — Sasta',
+                );
+                if (!context.mounted) return;
+                showSastaToast(
+                  context,
+                  ok ? 'Opened system share sheet' : 'List copied for sharing',
+                );
               },
             ),
           ],

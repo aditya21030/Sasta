@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../data/sasta_app_state.dart';
 import '../../models/models.dart';
+import '../../services/pincode_location_service.dart';
 import '../../theme/sasta_theme.dart';
 import '../../theme/sasta_tokens.dart';
 import '../../widgets/sasta_background.dart';
@@ -10,8 +13,36 @@ import '../../widgets/sasta_components.dart';
 import '../../widgets/sasta_mascot.dart';
 import '../../widgets/sasta_sheets.dart';
 
-class LocationsScreen extends StatelessWidget {
+class LocationsScreen extends StatefulWidget {
   const LocationsScreen({super.key});
+
+  @override
+  State<LocationsScreen> createState() => _LocationsScreenState();
+}
+
+class _LocationsScreenState extends State<LocationsScreen> {
+  bool _isDetecting = false;
+
+  Future<void> _detectCurrentLocation() async {
+    if (_isDetecting) return;
+    setState(() => _isDetecting = true);
+    final state = SastaScope.read(context);
+    final result = await state.detectAndApplyCurrentLocation();
+    if (!mounted) return;
+    setState(() => _isDetecting = false);
+    final resolved = result.resolved;
+    if (resolved != null) {
+      showSastaToast(
+        context,
+        'Location set to ${resolved.pincode} · ${resolved.displayArea}',
+      );
+    } else {
+      showSastaToast(
+        context,
+        result.errorMessage ?? 'Could not detect location.',
+      );
+    }
+  }
 
   Future<void> _openAddLocationSheet(
     BuildContext context, {
@@ -22,6 +53,7 @@ class LocationsScreen extends StatelessWidget {
     final pinCtrl = TextEditingController(text: existing?.pincode ?? '');
     final areaCtrl = TextEditingController(text: existing?.area ?? '');
     var makeDefault = existing?.isDefault ?? true;
+    var lookingUpPin = false;
 
     await showSastaSheet(
       context: context,
@@ -29,6 +61,18 @@ class LocationsScreen extends StatelessWidget {
         final palette = ctx.sasta;
         return StatefulBuilder(
           builder: (ctx, setModalState) {
+            Future<void> handlePinChanged(String value) async {
+              final trimmed = value.trim();
+              if (!PincodeLocationService.isValidPincode(trimmed)) return;
+              setModalState(() => lookingUpPin = true);
+              final resolved = await state.locationService.lookupPincode(trimmed);
+              if (!ctx.mounted) return;
+              setModalState(() => lookingUpPin = false);
+              if (resolved != null && pinCtrl.text.trim() == trimmed) {
+                areaCtrl.text = resolved.displayArea;
+              }
+            }
+
             return Padding(
               padding: const EdgeInsets.fromLTRB(22, 14, 22, 28),
               child: Column(
@@ -47,9 +91,15 @@ class LocationsScreen extends StatelessWidget {
                     hint: '6-digit pincode',
                     digitsOnly: true,
                     maxLength: 6,
+                    onChanged: (v) => unawaited(handlePinChanged(v)),
                   ),
                   const SizedBox(height: 10),
-                  _ModalField(controller: areaCtrl, hint: 'City / Area'),
+                  _ModalField(
+                    controller: areaCtrl,
+                    hint: lookingUpPin
+                        ? 'Looking up area via India Post…'
+                        : 'City / Area',
+                  ),
                   const SizedBox(height: 12),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -279,15 +329,11 @@ class LocationsScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 SastaOutlineButton(
-                  label: 'Detect current location',
+                  label: _isDetecting
+                      ? 'Detecting location…'
+                      : 'Detect current location',
                   height: 48,
-                  onPressed: () {
-                    state.setDefaultLocation(state.locations.first.id);
-                    showSastaToast(
-                      context,
-                      'Location set to ${state.activeLocation.pincode}',
-                    );
-                  },
+                  onPressed: _isDetecting ? null : _detectCurrentLocation,
                 ),
               ],
             ),
@@ -304,12 +350,14 @@ class _ModalField extends StatelessWidget {
     required this.hint,
     this.digitsOnly = false,
     this.maxLength,
+    this.onChanged,
   });
 
   final TextEditingController controller;
   final String hint;
   final bool digitsOnly;
   final int? maxLength;
+  final ValueChanged<String>? onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -324,6 +372,7 @@ class _ModalField extends StatelessWidget {
       alignment: Alignment.center,
       child: TextField(
         controller: controller,
+        onChanged: onChanged,
         keyboardType: digitsOnly ? TextInputType.number : TextInputType.text,
         inputFormatters: [
           if (digitsOnly) FilteringTextInputFormatter.digitsOnly,

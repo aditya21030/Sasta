@@ -4,9 +4,10 @@ import 'app/sasta_router.dart';
 import 'data/sasta_app_state.dart';
 import 'theme/sasta_theme.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const SastaApp());
+  final loadedState = await SastaAppState.createAndLoad();
+  runApp(SastaApp(stateOverride: loadedState));
 }
 
 /// Root widget for Sasta — Mehenga Kyun? Sasta Hai Na!

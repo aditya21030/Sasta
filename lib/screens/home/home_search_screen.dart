@@ -38,7 +38,7 @@ class _HomeSearchScreenState extends State<HomeSearchScreen> {
     final state = SastaScope.of(context);
     final palette = context.sasta;
     final suggestions = _query.trim().isEmpty
-        ? MockCatalog.products.take(4).toList()
+        ? state.products.take(4).toList()
         : state.searchProducts(_query);
 
     return Scaffold(

@@ -198,6 +198,30 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                   label: 'Submit request',
                   onPressed: _submit,
                 ),
+                const SizedBox(height: 10),
+                SastaOutlineButton(
+                  label: 'Open email support ↗',
+                  height: 48,
+                  onPressed: () async {
+                    final subject = _subjectCtrl.text.trim().isEmpty
+                        ? 'Sasta Support: $_selectedTopic'
+                        : _subjectCtrl.text.trim();
+                    final body = _messageCtrl.text.trim().isEmpty
+                        ? 'Hi Sasta team,\n\nI need help with $_selectedTopic.'
+                        : _messageCtrl.text.trim();
+                    final launched = await state.retailerLauncher.openSupportEmail(
+                      subject: subject,
+                      body: body,
+                    );
+                    if (!context.mounted) return;
+                    if (!launched) {
+                      showSastaToast(
+                        context,
+                        'Email support@sastaapp.in or submit above.',
+                      );
+                    }
+                  },
+                ),
                 const SizedBox(height: 24),
                 Text(
                   'PREVIOUS REQUESTS',

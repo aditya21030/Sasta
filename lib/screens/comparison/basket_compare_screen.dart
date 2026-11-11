@@ -37,6 +37,11 @@ class _BasketCompareScreenState extends State<BasketCompareScreen> {
       customEntries: widget.args?.customEntries,
     );
     final cheapest = comp.cheapestCompleteStore;
+    final basketQuery = state.activeBasket.entries
+        .map((e) => state.productById(e.productId)?.name)
+        .whereType<String>()
+        .take(2)
+        .join(' ');
 
     return Scaffold(
       body: SastaBackground(
@@ -95,7 +100,10 @@ class _BasketCompareScreenState extends State<BasketCompareScreen> {
                     20,
                   ),
                   child: switch (_tabIndex) {
-                    0 => _SingleStoreBody(comparison: comp),
+                    0 => _SingleStoreBody(
+                        comparison: comp,
+                        searchQuery: basketQuery,
+                      ),
                     1 => _SplitBasketBody(comparison: comp),
                     _ => _SavingsBody(comparison: comp),
                   },
@@ -108,7 +116,7 @@ class _BasketCompareScreenState extends State<BasketCompareScreen> {
                   SastaSpace.page,
                   22,
                 ),
-                child: _buildBottomCta(context, cheapest, comp),
+                child: _buildBottomCta(context, cheapest, comp, basketQuery),
               ),
             ],
           ),
@@ -121,7 +129,9 @@ class _BasketCompareScreenState extends State<BasketCompareScreen> {
     BuildContext context,
     StoreBasketTotal? cheapest,
     BasketComparisonResult comp,
+    String basketQuery,
   ) {
+    final queryOrNull = basketQuery.trim().isEmpty ? null : basketQuery;
     if (_tabIndex == 1 && cheapest != null) {
       return SastaPrimaryButton(
         label: '${cheapest.retailer.shortName} only · ₹${cheapest.totalPrice}',
@@ -129,6 +139,7 @@ class _BasketCompareScreenState extends State<BasketCompareScreen> {
           context,
           retailer: cheapest.retailer,
           estimatedAmount: cheapest.totalPrice,
+          searchQuery: queryOrNull,
         ),
       );
     }
@@ -139,6 +150,7 @@ class _BasketCompareScreenState extends State<BasketCompareScreen> {
           context,
           retailer: cheapest.retailer,
           estimatedAmount: cheapest.totalPrice,
+          searchQuery: queryOrNull,
         ),
       );
     }
@@ -150,6 +162,7 @@ class _BasketCompareScreenState extends State<BasketCompareScreen> {
                 context,
                 retailer: comp.splitSlices.first.retailer,
                 estimatedAmount: comp.splitSlices.first.subtotal,
+                searchQuery: queryOrNull,
               ),
     );
   }
@@ -197,8 +210,12 @@ class _SegTab extends StatelessWidget {
 }
 
 class _SingleStoreBody extends StatelessWidget {
-  const _SingleStoreBody({required this.comparison});
+  const _SingleStoreBody({
+    required this.comparison,
+    this.searchQuery,
+  });
   final BasketComparisonResult comparison;
+  final String? searchQuery;
 
   @override
   Widget build(BuildContext context) {
@@ -260,6 +277,9 @@ class _SingleStoreBody extends StatelessWidget {
                         context,
                         retailer: store.retailer,
                         estimatedAmount: store.totalPrice,
+                        searchQuery: searchQuery?.trim().isEmpty == true
+                            ? null
+                            : searchQuery,
                       )
                   : null,
               border: store == winner

@@ -1,7 +1,14 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart' as url_launcher;
 
+import 'package:sasta/data/mock_catalog.dart';
 import 'package:sasta/data/sasta_app_state.dart';
 import 'package:sasta/main.dart';
 import 'package:sasta/models/models.dart';
@@ -9,8 +16,15 @@ import 'package:sasta/screens/basket/basket_screen.dart';
 import 'package:sasta/screens/comparison/basket_compare_screen.dart';
 import 'package:sasta/screens/help_legal/help_centre_screen.dart';
 import 'package:sasta/screens/home/home_search_screen.dart';
+import 'package:sasta/screens/onboarding/pincode_screen.dart';
+import 'package:sasta/screens/profile/comparison_prefs_screen.dart';
 import 'package:sasta/screens/profile/profile_screen.dart';
 import 'package:sasta/screens/sasta_plus/plus_landing_screen.dart';
+import 'package:sasta/services/local_storage_service.dart';
+import 'package:sasta/services/pincode_location_service.dart';
+import 'package:sasta/services/quick_commerce_api.dart';
+import 'package:sasta/services/retailer_launcher_service.dart';
+import 'package:sasta/services/share_service.dart';
 
 void main() {
   setUpAll(() {
@@ -338,6 +352,335 @@ void main() {
       await tester.tap(find.bySemanticsLabel('Saved'));
       await pumpRoute(tester, 400);
       expect(find.text('Saved'), findsWidgets);
+    },
+  );
+
+  test('Product and state models round-trip through JSON cleanly', () {
+    final sample = MockCatalog.products.first;
+    final decoded = Product.fromJson(
+      jsonDecode(jsonEncode(sample.toJson())) as Map<String, dynamic>,
+    );
+    expect(decoded.id, sample.id);
+    expect(decoded.name, sample.name);
+    expect(decoded.variants.length, sample.variants.length);
+    expect(
+      decoded.cheapestQuote(decoded.defaultVariantIndex)?.price,
+      sample.cheapestQuote(sample.defaultVariantIndex)?.price,
+    );
+
+    const loc = SavedLocation(
+      id: 'loc_x',
+      label: 'Home',
+      pincode: '560034',
+      area: 'Koramangala, Bengaluru',
+      isDefault: true,
+    );
+    final decodedLoc = SavedLocation.fromJson(
+      jsonDecode(jsonEncode(loc.toJson())) as Map<String, dynamic>,
+    );
+    expect(decodedLoc.pincode, '560034');
+    expect(decodedLoc.area, 'Koramangala, Bengaluru');
+    expect(decodedLoc.isDefault, isTrue);
+  });
+
+  test(
+    'SharedPreferences persists onboarding, pincode, basket, theme & API config',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      final storage = LocalStorageService();
+
+      final s1 = await SastaAppState.createAndLoad(storage: storage);
+      s1.completeSplash();
+      s1.completeOnboarding();
+      s1.completePincode('560034', area: 'Koramangala');
+      s1.setThemeMode(ThemeMode.dark);
+      s1.addToBasket('amul_butter', delta: 2);
+      await s1.updateApiConfig(
+        baseUrl: 'https://api.sasta.example',
+        apiKey: 'secret_token',
+        syncNow: false,
+      );
+      await s1.flushPersistence();
+      s1.dispose();
+
+      final s2 = await SastaAppState.createAndLoad(
+        storage: storage,
+        syncIfConfigured: false,
+      );
+      addTearDown(s2.dispose);
+      expect(s2.hasSeenOnboarding, isTrue);
+      expect(s2.hasSetPincode, isTrue);
+      expect(s2.activeLocation.pincode, '560034');
+      expect(s2.themeMode, ThemeMode.dark);
+      expect(s2.quantityInActiveBasket('amul_butter'), 2);
+      expect(s2.apiBaseUrl, 'https://api.sasta.example');
+      expect(s2.apiKey, 'secret_token');
+    },
+  );
+
+  test(
+    'HttpQuickCommerceRepository syncs live API catalog and merges into SastaAppState',
+    () async {
+      Uri? capturedUri;
+      Map<String, String>? capturedHeaders;
+
+      final mockClient = MockClient((request) async {
+        capturedUri = request.url;
+        capturedHeaders = request.headers;
+        if (request.url.path.endsWith('/v1/catalog/home')) {
+          return http.Response.bytes(
+            utf8.encode(
+              jsonEncode({
+                'pincode': '560034',
+                'area': 'Koramangala, Bengaluru',
+                'serviceableRetailers': ['blinkit', 'zepto'],
+                'products': [
+                  {
+                    'id': 'live_avocado',
+                    'name': 'Hass Avocado Imported',
+                    'brand': 'FreshKart',
+                    'categoryId': 'fruits_veg',
+                    'categoryLabel': 'Fruits & Vegetables',
+                    'subtitle': '1 pc (approx 180 g)',
+                    'artKind': 'veg',
+                    'pastel': 'mint',
+                    'defaultVariantIndex': 0,
+                    'isDeal': true,
+                    'variants': [
+                      {
+                        'label': '1 pc',
+                        'quotes': [
+                          {
+                            'retailer': 'zepto',
+                            'price': 89,
+                            'mrp': 125,
+                            'packLabel': '1 pc',
+                            'unitPriceText': '₹89/pc',
+                            'stockStatus': 'inStock',
+                          },
+                        ],
+                      },
+                    ],
+                  },
+                ],
+              }),
+            ),
+            200,
+            headers: const {'content-type': 'application/json; charset=utf-8'},
+          );
+        }
+        return http.Response('Not found', 404);
+      });
+
+      final repo = HttpQuickCommerceRepository(
+        config: const QuickCommerceApiConfig(
+          baseUrl: 'https://api.sasta.test',
+          apiKey: 'key_99',
+        ),
+        client: mockClient,
+      );
+
+      final state = SastaAppState(repository: repo);
+      addTearDown(state.dispose);
+      state.completePincode('560034', area: 'Bengaluru');
+
+      final synced = await state.syncCatalogForLocation();
+      expect(synced, isTrue);
+      expect(capturedUri?.path, '/v1/catalog/home');
+      expect(capturedUri?.queryParameters['pincode'], '560034');
+      expect(capturedHeaders?['Authorization'], 'Bearer key_99');
+      expect(capturedHeaders?['X-API-Key'], 'key_99');
+      expect(state.isLiveCatalogActive, isTrue);
+      expect(state.activeLocation.area, 'Koramangala, Bengaluru');
+      expect(state.productById('live_avocado')?.name, 'Hass Avocado Imported');
+      expect(state.productById('live_avocado')?.cheapestQuote(0)?.price, 89);
+    },
+  );
+
+  test(
+    'PincodeLocationService resolves India Post pincodes & GPS Nominatim coordinates',
+    () async {
+      final mockClient = MockClient((request) async {
+        if (request.url.host == 'api.postalpincode.in') {
+          return http.Response(
+            jsonEncode([
+              {
+                'Status': 'Success',
+                'PostOffice': [
+                  {
+                    'Name': 'Koramangala I Block',
+                    'Block': 'Bengaluru South',
+                    'District': 'Bengaluru',
+                    'State': 'Karnataka',
+                  },
+                ],
+              },
+            ]),
+            200,
+          );
+        }
+        if (request.url.host == 'nominatim.openstreetmap.org') {
+          return http.Response(
+            jsonEncode({
+              'address': {
+                'postcode': '560034',
+                'suburb': 'Koramangala',
+                'city': 'Bengaluru',
+                'state': 'Karnataka',
+              },
+            }),
+            200,
+          );
+        }
+        return http.Response('', 404);
+      });
+
+      final service = PincodeLocationService(
+        client: mockClient,
+        positionProvider: () async => (lat: 12.9352, lng: 77.6245),
+      );
+      addTearDown(service.dispose);
+
+      final postal = await service.lookupPincode('560034');
+      expect(postal?.pincode, '560034');
+      expect(postal?.displayArea, 'Bengaluru South, Bengaluru');
+
+      final gps = await service.detectCurrentLocation();
+      expect(gps.isSuccess, isTrue);
+      expect(gps.resolved?.pincode, '560034');
+      expect(gps.resolved?.displayArea, 'Koramangala, Bengaluru');
+    },
+  );
+
+  test(
+    'RetailerLauncherService & SastaShareService build store links & delegate launches',
+    () async {
+      expect(
+        RetailerLauncherService.buildWebUri(
+          RetailerId.blinkit,
+          query: 'Amul Milk',
+        ).toString(),
+        'https://blinkit.com/s/?q=Amul+Milk',
+      );
+      expect(
+        RetailerLauncherService.buildWebUri(
+          RetailerId.zepto,
+          query: 'Bread',
+        ).toString(),
+        'https://www.zeptonow.com/search?query=Bread',
+      );
+
+      final launchedUris = <Uri>[];
+      final launcher = RetailerLauncherService(
+        canLaunchDelegate: (_) async => false,
+        launchUrlDelegate: (uri, {mode = url_launcher.LaunchMode.platformDefault}) async {
+          launchedUris.add(uri);
+          return true;
+        },
+      );
+
+      final outcome =
+          await launcher.openRetailer(RetailerId.instamart, query: 'Dahi');
+      expect(outcome.launched, isTrue);
+      expect(outcome.openedNativeApp, isFalse);
+      expect(launchedUris.single.host, 'www.swiggy.com');
+
+      String? sharedPayload;
+      final shareService = SastaShareService(
+        shareDelegate: (text, {subject}) async {
+          sharedPayload = text;
+        },
+        whatsAppDelegate: (uri) async {
+          launchedUris.add(uri);
+          return true;
+        },
+      );
+
+      await shareService.shareToWhatsApp('Milk ₹27');
+      await shareService.shareText('Basket ₹266');
+      expect(launchedUris.last.host, 'wa.me');
+      expect(sharedPayload, 'Basket ₹266');
+    },
+  );
+
+  testWidgets(
+    'PincodeScreen resolves India Post + GPS & ComparisonPrefs saves API config',
+    (WidgetTester tester) async {
+      await tester.binding.setSurfaceSize(const Size(412, 915));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      final mockClient = MockClient((request) async {
+        if (request.url.host == 'api.postalpincode.in') {
+          return http.Response(
+            jsonEncode([
+              {
+                'Status': 'Success',
+                'PostOffice': [
+                  {
+                    'Name': 'Indiranagar',
+                    'Block': 'Bengaluru East',
+                    'District': 'Bengaluru',
+                    'State': 'Karnataka',
+                  },
+                ],
+              },
+            ]),
+            200,
+          );
+        }
+        if (request.url.host == 'nominatim.openstreetmap.org') {
+          return http.Response(
+            jsonEncode({
+              'address': {
+                'postcode': '560038',
+                'suburb': 'Indiranagar',
+                'city': 'Bengaluru',
+              },
+            }),
+            200,
+          );
+        }
+        return http.Response('[]', 200);
+      });
+
+      final locService = PincodeLocationService(
+        client: mockClient,
+        positionProvider: () async => (lat: 12.9784, lng: 77.6408),
+      );
+      addTearDown(locService.dispose);
+
+      final state = SastaAppState(locationService: locService);
+      addTearDown(state.dispose);
+      state.completeSplash();
+      state.completeOnboarding();
+
+      await tester.pumpWidget(SastaApp(stateOverride: state));
+      await pumpRoute(tester, 450);
+
+      expect(find.byType(PincodeScreen), findsOneWidget);
+      await tester.tap(find.text('Use my current location'));
+      await tester.pump(const Duration(milliseconds: 250));
+      expect(find.text('560038'), findsOneWidget);
+
+      await tester.tap(find.text('Continue'));
+      await pumpRoute(tester, 700);
+      expect(state.activeLocation.pincode, '560038');
+      expect(find.text('What are we\nsaving on today?'), findsOneWidget);
+
+      await tester.tap(find.bySemanticsLabel('Profile'));
+      await pumpRoute(tester, 450);
+      await scrollSafeIntoView(
+        tester,
+        find.text('Comparison preferences'),
+        scrollableIn(ProfileScreen),
+        delta: 220,
+      );
+      await tester.tap(find.text('Comparison preferences'));
+      await pumpRoute(tester, 550);
+
+      expect(find.byType(ComparisonPrefsScreen), findsOneWidget);
+      expect(find.text('QUICK-COMMERCE API'), findsOneWidget);
+      expect(find.text('Save & sync live prices'), findsOneWidget);
     },
   );
 }

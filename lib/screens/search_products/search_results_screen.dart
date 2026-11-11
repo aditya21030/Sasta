@@ -42,8 +42,16 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (!_initialized) {
-      _sortBy = SastaScope.read(context).defaultSort;
+      final state = SastaScope.read(context);
+      _sortBy = state.defaultSort;
       _initialized = true;
+      if (state.isApiConfigured &&
+          (_query.trim().isNotEmpty || (_categoryId?.isNotEmpty ?? false))) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          state.searchProductsRemote(_query, categoryId: _categoryId);
+        });
+      }
     }
   }
 
@@ -185,6 +193,12 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                             onSubmitted: (v) {
                               state.addSearchQuery(v);
                               setState(() => _query = v);
+                              if (state.isApiConfigured) {
+                                state.searchProductsRemote(
+                                  v,
+                                  categoryId: _categoryId,
+                                );
+                              }
                             },
                             onClear: () => setState(() {
                               _controller.clear();

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../app/sasta_routes.dart';
-import '../../data/mock_catalog.dart';
 import '../../data/sasta_app_state.dart';
 import '../../theme/sasta_theme.dart';
 import '../../theme/sasta_tokens.dart';
@@ -29,7 +28,11 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
       if (!mounted) return;
       final pId = widget.args?.productId;
       if (pId != null) {
-        SastaScope.read(context).addToRecentlyViewed(pId);
+        final state = SastaScope.read(context);
+        state.addToRecentlyViewed(pId);
+        if (state.isApiConfigured) {
+          state.refreshProductDetails(pId);
+        }
       }
     });
   }
@@ -39,7 +42,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     final state = SastaScope.of(context);
     final palette = context.sasta;
     final product = state.productById(widget.args?.productId ?? 'amul_milk') ??
-        MockCatalog.products.first;
+        state.products.first;
     final vIdx = _selectedVariantIndex ??
         widget.args?.variantIndex ??
         product.defaultVariantIndex;

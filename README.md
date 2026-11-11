@@ -24,12 +24,32 @@
 
 | Area | Capabilities |
 | :--- | :--- |
-| **Hyperlocal Discovery** | Auto-advancing Splash, onboarding carousel, and 6-digit Indian pincode selector with recent & preset areas (`Central Delhi`, saved delivery addresses). |
+| **Hyperlocal Pincode & GPS** | Real India Post pincode area lookup (`api.postalpincode.in`), GPS coordinate detection (`geolocator` + native `geocoding` + OSM Nominatim fallback), and persistent saved delivery addresses. |
+| **Quick-Commerce REST API** | Configurable `QuickCommerceRepository` (`--dart-define` or runtime Profile → Comparison Preferences setup), pull-to-refresh home feed sync, remote search merge, live price history fetch, and automatic offline/cached fallback. |
 | **Side-by-Side Comparison** | Search with recent history, trending queries, category tiles, pack-size variant switches (`250 ml`, `500 ml`, `1 L`), unit-price breakdown, and mismatch/stock status badges. |
-| **Price History & Alerts** | Interactive `7D` / `30D` / `90D` / `All` price trend charts with Lowest, Average, and Highest markers plus target price-drop alerts. |
-| **Smart Basket Optimizer** | Multiple saved baskets (`Weekly Essentials`, templates, quick sharing), quantity steppers, and a live **Single Store vs. Split Basket vs. Savings** comparison engine. |
-| **Sasta+ Membership** | Full upgrade funnel with benefits landing view, Monthly/Yearly plan selector, checkout flow with celebratory confetti transition, membership management, and invoice history. |
-| **Profile, Light/Dark & Help** | Editable profile, delivery locations, notification & retailer preferences, Light/Dark/System appearance switcher, Help Centre topics, searchable FAQs, support tickets, feedback, and legal pages. |
+| **Deep-Link Handoff & Share** | Opens native Blinkit, Zepto, Swiggy Instamart, and Flipkart Minutes search intents (`url_launcher`) with official web store fallbacks, plus native OS share sheet (`share_plus`), WhatsApp share, clipboard copy, and email support links. |
+| **Persistent State (`SharedPreferences`)** | Saves active location, theme preference, custom/multiple grocery baskets, price alerts, favourites, search history, comparison prefs, support tickets, and cached live catalog items across restarts. |
+| **Sasta+ Membership & Profile** | Light/Dark/System theme switcher, editable profile, Sasta+ plans & checkout funnel with invoices, Help Centre FAQs, and support requests. |
+
+---
+
+## Quick-Commerce API Integration
+
+Configure your backend base URL and API key at build time or at runtime inside **Profile → Comparison Preferences**:
+
+```bash
+flutter run --dart-define=SASTA_API_BASE_URL=https://api.yourdomain.com --dart-define=SASTA_API_KEY=your_api_key
+```
+
+### Expected REST Endpoints
+
+- `GET /v1/catalog/home?pincode=<pin>&lat=<lat>&lng=<lng>` — returns `{ "products": [...], "area": "...", "serviceableRetailers": [...] }`
+- `GET /v1/catalog/search?q=<query>&pincode=<pin>&categoryId=<id>` — returns `{ "products": [...] }`
+- `GET /v1/catalog/products/<id>?pincode=<pin>` — returns `{ "product": {...} }`
+- `GET /v1/catalog/products/<id>/history?pincode=<pin>` — returns `{ "historyByRange": { "7D": ..., "30D": ..., "90D": ... } }`
+- `GET /v1/serviceability?pincode=<pin>` — returns `{ "pincode": "...", "area": "...", "serviceable": true, "retailers": [...] }`
+
+When `SASTA_API_BASE_URL` is unconfigured or offline, Sasta automatically serves its cached catalog so comparison workflows keep working seamlessly.
 
 ---
 
@@ -40,18 +60,24 @@ sasta/
 ├── assets/
 │   └── app_icon.png                 # Source Sasta 3D mascot app icon
 ├── lib/
-│   ├── main.dart                    # App entry point, ThemeMode & SastaScope setup
+│   ├── main.dart                    # Persistent SastaAppState.createAndLoad & SastaScope entry
 │   ├── app/
 │   │   ├── sasta_routes.dart        # Typed route constants & navigation helpers
 │   │   └── sasta_router.dart        # Root flow (Splash -> Onboarding -> Shell) & page transitions
+│   ├── services/
+│   │   ├── quick_commerce_api.dart  # QuickCommerceRepository & HttpQuickCommerceRepository REST client
+│   │   ├── local_storage_service.dart # SharedPreferences snapshot persistence & catalog cache
+│   │   ├── pincode_location_service.dart # India Post API + Geolocator/Geocoding/Nominatim GPS resolver
+│   │   ├── retailer_launcher_service.dart # Blinkit/Zepto/Instamart/Minutes native + web deep-links
+│   │   └── share_service.dart       # Native OS share sheet & WhatsApp share integration
 │   ├── theme/
 │   │   ├── sasta_tokens.dart        # Brand palette, semantic pastels, spacing & motion tokens
 │   │   └── sasta_theme.dart         # Light/Dark ThemeData & DMSans typography scale
 │   ├── models/
-│   │   └── models.dart              # Retailers, Products, Variants, Baskets & Comparison models
+│   │   └── models.dart              # Retailers, Products, Baskets & JSON serialization (`toJson`/`fromJson`)
 │   ├── data/
-│   │   ├── mock_catalog.dart        # Grocery catalog, categories, price series, FAQs
-│   │   └── sasta_app_state.dart     # ChangeNotifier app state & basket optimizer logic
+│   │   ├── mock_catalog.dart        # Initial bundled grocery catalog fallback & FAQs
+│   │   └── sasta_app_state.dart     # ChangeNotifier state, live API sync, persistence & basket math
 │   ├── widgets/
 │   │   ├── sasta_components.dart    # Cards, gradient price text, chips, tags, steppers, bottom nav
 │   │   ├── sasta_motion.dart        # Reduced-motion-safe FadeUp & FloatBob animations
@@ -117,5 +143,5 @@ The release APK is generated at `build/app/outputs/flutter-apk/app-release.apk`.
 
 ## Verification
 
-- `flutter analyze` — static checks across all Dart sources and widget tests.
-- `flutter test` — comparison math assertions (`Single store`, `Split basket`, savings), full onboarding & back-navigation flows, search to product comparison & price history, basket quantity steppers, Dark Mode switching, Sasta+ checkout, Help/FAQs, and compact `360x640` layout verification.
+- `flutter analyze` — zero static issues across all Dart sources, services, models, screens, and tests.
+- `flutter test` — comparison engine math, JSON model serialization, `SharedPreferences` persistence round-trip, mocked HTTP Quick-Commerce API sync, India Post + GPS Nominatim lookup, Blinkit/Zepto/Instamart/Minutes URL & OS Share delegates, full onboarding & back-navigation flows, Dark Mode switching, Sasta+ checkout, Help/FAQs, and compact `360x640` layout verification.

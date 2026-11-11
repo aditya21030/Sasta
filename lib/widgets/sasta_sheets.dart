@@ -157,7 +157,9 @@ Future<void> showRetailerHandoffSheet(
   required RetailerId retailer,
   required int estimatedAmount,
   String? itemLabel,
+  String? searchQuery,
 }) async {
+  final state = SastaScope.read(context);
   await showSastaSheet(
     context: context,
     builder: (ctx) {
@@ -217,12 +219,21 @@ Future<void> showRetailerHandoffSheet(
             const SizedBox(height: 18),
             SastaPrimaryButton(
               label: 'Launch ${retailer.shortName} ↗',
-              onPressed: () {
-                Clipboard.setData(ClipboardData(text: retailer.schemeUrl));
+              onPressed: () async {
                 Navigator.of(ctx).pop();
+                final outcome = await state.retailerLauncher.openRetailer(
+                  retailer,
+                  query: searchQuery ?? itemLabel,
+                );
+                await Clipboard.setData(
+                  ClipboardData(text: outcome.targetUri.toString()),
+                );
+                if (!context.mounted) return;
                 showSastaToast(
                   context,
-                  'Redirected to ${retailer.name} (${retailer.eta})',
+                  outcome.launched
+                      ? 'Opening ${retailer.name} (${retailer.eta})'
+                      : 'Link copied for ${retailer.name}: ${outcome.targetUri}',
                 );
               },
             ),

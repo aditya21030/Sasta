@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../app/sasta_routes.dart';
-import '../../data/mock_catalog.dart';
 import '../../data/sasta_app_state.dart';
 import '../../models/models.dart';
 import '../../theme/sasta_theme.dart';
@@ -23,7 +22,7 @@ class ProductCompareScreen extends StatelessWidget {
     final palette = context.sasta;
     final product =
         state.productById(args?.productId ?? 'amul_milk') ??
-            MockCatalog.products.first;
+            state.products.first;
     final vIdx = args?.variantIndex ?? product.defaultVariantIndex;
     final variant = product.variantAt(vIdx);
     final quotes = product.sortedQuotes(
@@ -163,6 +162,7 @@ class ProductCompareScreen extends StatelessWidget {
                               estimatedAmount: cheapest.price!,
                               itemLabel:
                                   '${product.name} (${cheapest.packLabel})',
+                              searchQuery: product.name,
                             ),
                             borderRadius: BorderRadius.circular(24),
                             child: Padding(
@@ -219,6 +219,7 @@ class ProductCompareScreen extends StatelessWidget {
                                     estimatedAmount: q.price!,
                                     itemLabel:
                                         '${product.name} (${q.packLabel})',
+                                    searchQuery: product.name,
                                   )
                               : null,
                         ),
@@ -246,6 +247,7 @@ class ProductCompareScreen extends StatelessWidget {
                       retailer: cheapest.retailer,
                       estimatedAmount: cheapest.price!,
                       itemLabel: '${product.name} (${cheapest.packLabel})',
+                      searchQuery: product.name,
                     ),
                   ),
                 ),

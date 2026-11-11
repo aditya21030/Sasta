@@ -1,11 +1,90 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../models/models.dart';
+import '../services/local_storage_service.dart';
+import '../services/pincode_location_service.dart';
+import '../services/quick_commerce_api.dart';
+import '../services/retailer_launcher_service.dart';
+import '../services/share_service.dart';
 import '../theme/sasta_tokens.dart';
 import 'mock_catalog.dart';
 
 /// Root reactive application state shared across all Sasta tabs and pushed flows.
 class SastaAppState extends ChangeNotifier {
+  SastaAppState({
+    LocalStorageService? storage,
+    PincodeLocationService? locationService,
+    RetailerLauncherService? retailerLauncher,
+    SastaShareService? shareService,
+    QuickCommerceRepository? repository,
+  })  : _storage = storage,
+        _locationService = locationService ?? PincodeLocationService(),
+        _ownsLocationService = locationService == null,
+        _retailerLauncher = retailerLauncher ?? RetailerLauncherService(),
+        _shareService = shareService ?? SastaShareService(),
+        _hasCustomRepo = repository != null {
+    if (repository != null) {
+      _repository = repository;
+      _apiBaseUrl = repository.config.baseUrl;
+      _apiKey = repository.config.apiKey;
+    } else {
+      _repository = HttpQuickCommerceRepository(
+        config: QuickCommerceApiConfig(
+          baseUrl: _apiBaseUrl,
+          apiKey: _apiKey,
+        ),
+      );
+    }
+  }
+
+  /// Creates [SastaAppState], restores persisted state from SharedPreferences,
+  /// and triggers background API sync when configured.
+  static Future<SastaAppState> createAndLoad({
+    LocalStorageService? storage,
+    PincodeLocationService? locationService,
+    RetailerLauncherService? retailerLauncher,
+    SastaShareService? shareService,
+    QuickCommerceRepository? repository,
+    bool syncIfConfigured = true,
+  }) async {
+    final state = SastaAppState(
+      storage: storage ?? LocalStorageService(),
+      locationService: locationService,
+      retailerLauncher: retailerLauncher,
+      shareService: shareService,
+      repository: repository,
+    );
+    await state.loadFromStorage();
+    if (syncIfConfigured && state.hasSetPincode && state.isApiConfigured) {
+      unawaited(state.syncCatalogForLocation());
+    }
+    return state;
+  }
+
+  final LocalStorageService? _storage;
+  final PincodeLocationService _locationService;
+  final bool _ownsLocationService;
+  final RetailerLauncherService _retailerLauncher;
+  final SastaShareService _shareService;
+  final bool _hasCustomRepo;
+  late QuickCommerceRepository _repository;
+
+  Timer? _saveTimer;
+  bool _isHydrating = false;
+  bool _isDisposed = false;
+
+  // Dynamic catalog + Quick-Commerce API sync state
+  List<Product> _products = List<Product>.from(MockCatalog.products);
+  String _apiBaseUrl = QuickCommerceApiConfig.envBaseUrl;
+  String _apiKey = QuickCommerceApiConfig.envApiKey;
+  bool _isCatalogSyncing = false;
+  bool _isLiveCatalogActive = false;
+  DateTime? _lastSyncedAt;
+  String? _lastSyncError;
+  List<RetailerId> _serviceableRetailers = const [];
+
   // Flow & demo states
   bool _hasCompletedSplash = false;
   bool _hasSeenOnboarding = false;
@@ -392,11 +471,426 @@ class SastaAppState extends ChangeNotifier {
   List<SubscriptionInvoice> get invoices => List.unmodifiable(_invoices);
   List<SupportTicket> get supportTickets => List.unmodifiable(_supportTickets);
 
+  List<Product> get products => List.unmodifiable(_products);
+  String get apiBaseUrl => _apiBaseUrl;
+  String get apiKey => _apiKey;
+  bool get isApiConfigured => _repository.isConfigured;
+  bool get isCatalogSyncing => _isCatalogSyncing;
+  bool get isLiveCatalogActive => _isLiveCatalogActive;
+  DateTime? get lastSyncedAt => _lastSyncedAt;
+  String? get lastSyncError => _lastSyncError;
+  List<RetailerId> get serviceableRetailers =>
+      List.unmodifiable(_serviceableRetailers);
+
+  PincodeLocationService get locationService => _locationService;
+  RetailerLauncherService get retailerLauncher => _retailerLauncher;
+  SastaShareService get shareService => _shareService;
+
   Product? productById(String id) {
-    for (final p in MockCatalog.products) {
+    for (final p in _products) {
       if (p.id == id) return p;
     }
     return null;
+  }
+
+  /// Restores user state, API config, and cached catalog from persistent storage.
+  Future<void> loadFromStorage() async {
+    final storage = _storage;
+    if (storage == null) return;
+    final snapshot = await storage.load();
+    if (snapshot == null) return;
+    _applySnapshot(snapshot);
+  }
+
+  /// Writes current application state immediately to persistent storage.
+  Future<void> flushPersistence() async {
+    _saveTimer?.cancel();
+    _saveTimer = null;
+    final storage = _storage;
+    if (storage == null) return;
+    await storage.save(_buildSnapshot());
+  }
+
+  void _scheduleSave() {
+    if (_storage == null || _isHydrating) return;
+    _saveTimer?.cancel();
+    _saveTimer = Timer(const Duration(milliseconds: 180), () {
+      unawaited(flushPersistence());
+    });
+  }
+
+  void _applySnapshot(SavedAppSnapshot s) {
+    _isHydrating = true;
+    try {
+      if (s.userName != null) _fullName = s.userName!;
+      if (s.userEmail != null) _email = s.userEmail!;
+      if (s.userPhone != null) _phone = s.userPhone!;
+      if (s.phoneVerified != null) _phoneVerified = s.phoneVerified!;
+      if (s.isDarkMode != null) {
+        _themeMode = s.isDarkMode! ? ThemeMode.dark : ThemeMode.light;
+      }
+      if (s.useLocation != null) {
+        _pushNotificationsAll = s.useLocation!;
+      }
+      if (s.priceDropAlerts != null) _priceDropsNotif = s.priceDropAlerts!;
+      if (s.backInStockAlerts != null) _backInStockNotif = s.backInStockAlerts!;
+      if (s.weeklyDigest != null) _weeklySummaryNotif = s.weeklyDigest!;
+
+      if (s.enabledRetailerIds != null && s.enabledRetailerIds!.isNotEmpty) {
+        final parsed = s.enabledRetailerIds!
+            .map(RetailerId.tryParse)
+            .whereType<RetailerId>()
+            .toSet();
+        if (parsed.isNotEmpty) {
+          _enabledRetailers
+            ..clear()
+            ..addAll(parsed);
+        }
+      }
+      if (s.sortMode != null) _defaultSort = s.sortMode!;
+      if (s.hideOos != null) _includeUnavailable = !s.hideOos!;
+      if (s.showUnitPrice != null) _showUnitPrices = s.showUnitPrice!;
+      if (s.autoMatchVariants != null) _matchPackSizes = s.autoMatchVariants!;
+      if (s.basketMode != null) _defaultBasketMode = s.basketMode!;
+      if (s.selectedPlan != null) _planType = s.selectedPlan!;
+
+      if (s.savedLocations != null && s.savedLocations!.isNotEmpty) {
+        _locations
+          ..clear()
+          ..addAll(s.savedLocations!);
+      } else if (s.pincode != null && s.pincode!.length == 6) {
+        _locations[0] = _locations.first.copyWith(
+          pincode: s.pincode!,
+          area: s.area ?? _locations.first.area,
+          isDefault: true,
+        );
+      }
+
+      if (s.savedBaskets != null && s.savedBaskets!.isNotEmpty) {
+        _savedBaskets
+          ..clear()
+          ..addAll(s.savedBaskets!);
+      }
+      if (s.activeBasketId != null &&
+          _savedBaskets.any((b) => b.id == s.activeBasketId)) {
+        _activeBasketId = s.activeBasketId!;
+      }
+      if (s.basketEntries != null && _savedBaskets.isNotEmpty) {
+        final idx = _savedBaskets.indexWhere((b) => b.id == _activeBasketId);
+        final target = idx == -1 ? 0 : idx;
+        _savedBaskets[target] = _savedBaskets[target].copyWith(
+          entries: s.basketEntries,
+        );
+      }
+      if (s.activityLog != null) {
+        _basketActivities
+          ..clear()
+          ..addAll(s.activityLog!);
+      }
+      if (s.favouriteIds != null) {
+        _favouriteIds
+          ..clear()
+          ..addAll(s.favouriteIds!);
+      }
+      if (s.recentlyViewedIds != null) {
+        _recentlyViewedIds
+          ..clear()
+          ..addAll(s.recentlyViewedIds!);
+      }
+      if (s.alerts != null) {
+        _priceAlerts
+          ..clear()
+          ..addAll(s.alerts!);
+      }
+      if (s.notifications != null) {
+        _notifications
+          ..clear()
+          ..addAll(s.notifications!);
+      }
+      if (s.searchHistory != null) {
+        _searchHistory
+          ..clear()
+          ..addAll(s.searchHistory!);
+      }
+      if (s.tickets != null) {
+        _supportTickets
+          ..clear()
+          ..addAll(s.tickets!);
+      }
+      if (s.invoices != null) {
+        _invoices
+          ..clear()
+          ..addAll(s.invoices!);
+      }
+
+      if (!_hasCustomRepo &&
+          (s.apiBaseUrl != null || s.apiKey != null)) {
+        _apiBaseUrl = s.apiBaseUrl ?? _apiBaseUrl;
+        _apiKey = s.apiKey ?? _apiKey;
+        _repository = HttpQuickCommerceRepository(
+          config: QuickCommerceApiConfig(
+            baseUrl: _apiBaseUrl,
+            apiKey: _apiKey,
+          ),
+        );
+      }
+      if (s.lastSyncedAtIso != null) {
+        _lastSyncedAt = DateTime.tryParse(s.lastSyncedAtIso!);
+      }
+      if (s.cachedProducts != null && s.cachedProducts!.isNotEmpty) {
+        _products = _mergeProductLists(s.cachedProducts!, _products);
+        if (_lastSyncedAt != null && _apiBaseUrl.isNotEmpty) {
+          _isLiveCatalogActive = true;
+        }
+      }
+
+      if (s.isOnboarded == true) {
+        _hasSeenOnboarding = true;
+        _hasSetPincode = true;
+        _isLoggedOut = false;
+      }
+    } finally {
+      _isHydrating = false;
+    }
+    super.notifyListeners();
+  }
+
+  SavedAppSnapshot _buildSnapshot() {
+    final loc = activeLocation;
+    return SavedAppSnapshot(
+      userName: _fullName,
+      userEmail: _email,
+      userPhone: _phone,
+      phoneVerified: _phoneVerified,
+      pincode: loc.pincode,
+      area: loc.area,
+      isOnboarded: _hasSeenOnboarding && _hasSetPincode && !_isLoggedOut,
+      isDarkMode: _themeMode == ThemeMode.dark,
+      useLocation: _pushNotificationsAll,
+      priceDropAlerts: _priceDropsNotif,
+      backInStockAlerts: _backInStockNotif,
+      weeklyDigest: _weeklySummaryNotif,
+      enabledRetailerIds: _enabledRetailers.map((e) => e.id).toList(),
+      sortMode: _defaultSort,
+      hideOos: !_includeUnavailable,
+      showUnitPrice: _showUnitPrices,
+      deliveryFeeMode: 'default',
+      autoMatchVariants: _matchPackSizes,
+      basketMode: _defaultBasketMode,
+      selectedPlan: _planType,
+      activeBasketId: _activeBasketId,
+      recentlyViewedIds: List.of(_recentlyViewedIds),
+      apiBaseUrl: _apiBaseUrl,
+      apiKey: _apiKey,
+      lastSyncedAtIso: _lastSyncedAt?.toIso8601String(),
+      basketEntries: List.of(activeBasket.entries),
+      savedBaskets: List.of(_savedBaskets),
+      activityLog: List.of(_basketActivities),
+      favouriteIds: List.of(_favouriteIds),
+      alerts: List.of(_priceAlerts),
+      notifications: List.of(_notifications),
+      savedLocations: List.of(_locations),
+      searchHistory: List.of(_searchHistory),
+      tickets: List.of(_supportTickets),
+      invoices: List.of(_invoices),
+      cachedProducts: _isLiveCatalogActive ? List.of(_products) : null,
+    );
+  }
+
+  List<Product> _mergeProductLists(
+    List<Product> primary,
+    List<Product> fallback,
+  ) {
+    final seen = <String>{};
+    final merged = <Product>[];
+    for (final p in primary) {
+      if (seen.add(p.id)) merged.add(p);
+    }
+    for (final p in fallback) {
+      if (seen.add(p.id)) merged.add(p);
+    }
+    return merged;
+  }
+
+  /// Updates the quick-commerce API endpoint configuration and optionally syncs now.
+  Future<bool> updateApiConfig({
+    required String baseUrl,
+    String apiKey = '',
+    bool syncNow = true,
+  }) async {
+    _apiBaseUrl = baseUrl.trim();
+    _apiKey = apiKey.trim();
+    _lastSyncError = null;
+    if (!_hasCustomRepo) {
+      _repository = HttpQuickCommerceRepository(
+        config: QuickCommerceApiConfig(
+          baseUrl: _apiBaseUrl,
+          apiKey: _apiKey,
+        ),
+      );
+    }
+    if (!isApiConfigured) {
+      _isLiveCatalogActive = false;
+      notifyListeners();
+      return false;
+    }
+    notifyListeners();
+    if (syncNow) {
+      return syncCatalogForLocation();
+    }
+    return true;
+  }
+
+  /// Pulls live catalog prices for the active pincode from the Quick-Commerce API.
+  Future<bool> syncCatalogForLocation({double? lat, double? lng}) async {
+    if (_isDisposed) return false;
+    if (!isApiConfigured) {
+      _isLiveCatalogActive = false;
+      _lastSyncError = null;
+      notifyListeners();
+      return false;
+    }
+    _isCatalogSyncing = true;
+    _lastSyncError = null;
+    notifyListeners();
+
+    try {
+      final res = await _repository.fetchHomeCatalog(
+        pincode: activeLocation.pincode,
+        lat: lat,
+        lng: lng,
+      );
+      if (_isDisposed) return false;
+      if (res.products.isNotEmpty) {
+        _products = _mergeProductLists(res.products, _products);
+      }
+      _isLiveCatalogActive = true;
+      _lastSyncedAt = res.syncedAt;
+      _serviceableRetailers = res.serviceableRetailers;
+      if (res.area != null && res.area!.trim().isNotEmpty) {
+        final idx = _locations.indexWhere((l) => l.isDefault);
+        if (idx != -1) {
+          _locations[idx] = _locations[idx].copyWith(area: res.area!.trim());
+        }
+      }
+      return true;
+    } on QuickCommerceApiException catch (e) {
+      _lastSyncError = e.message;
+      return false;
+    } catch (e) {
+      _lastSyncError = 'Failed to sync catalog: $e';
+      return false;
+    } finally {
+      _isCatalogSyncing = false;
+      if (!_isDisposed) notifyListeners();
+    }
+  }
+
+  /// Queries remote API search and merges matching live items into the catalog cache.
+  Future<List<Product>> searchProductsRemote(
+    String query, {
+    String? categoryId,
+    RetailerId? retailerFilter,
+    bool inStockOnly = false,
+    int? maxPrice,
+    String? sortBy,
+  }) async {
+    if (isApiConfigured) {
+      try {
+        final remote = await _repository.searchProducts(
+          query: query,
+          pincode: activeLocation.pincode,
+          categoryId: categoryId,
+        );
+        if (remote.isNotEmpty) {
+          _products = _mergeProductLists(remote, _products);
+          _isLiveCatalogActive = true;
+          _lastSyncedAt = DateTime.now();
+          notifyListeners();
+        }
+      } catch (_) {
+        // Silently keep cached/local search results if remote search fails.
+      }
+    }
+    return searchProducts(
+      query,
+      categoryId: categoryId,
+      retailerFilter: retailerFilter,
+      inStockOnly: inStockOnly,
+      maxPrice: maxPrice,
+      sortBy: sortBy,
+    );
+  }
+
+  /// Refreshes latest quotes & price history for a single product when API is active.
+  Future<Product?> refreshProductDetails(String productId) async {
+    if (!isApiConfigured) return productById(productId);
+    try {
+      final fetched = await _repository.fetchProductDetails(
+        productId: productId,
+        pincode: activeLocation.pincode,
+      );
+      final history = await _repository.fetchPriceHistory(
+        productId: productId,
+        pincode: activeLocation.pincode,
+      );
+      if (fetched != null || history.isNotEmpty) {
+        final base = fetched ?? productById(productId);
+        if (base != null) {
+          final updated = history.isNotEmpty
+              ? base.copyWith(historyByRange: history)
+              : base;
+          _products = _mergeProductLists([updated], _products);
+          notifyListeners();
+          return updated;
+        }
+      }
+    } catch (_) {
+      // Keep cached product details when offline or endpoint is unavailable.
+    }
+    return productById(productId);
+  }
+
+  /// Resolves a 6-digit Indian pincode via India Post API and completes pincode setup.
+  Future<ResolvedPincode?> resolveAndCompletePincode(String rawPincode) async {
+    final cleaned = rawPincode.trim();
+    final resolved = await _locationService.lookupPincode(cleaned);
+    completePincode(
+      cleaned,
+      area: resolved?.displayArea ?? activeLocation.area,
+    );
+    return resolved;
+  }
+
+  /// Detects current GPS coordinates, reverse-geocodes Indian pincode + area,
+  /// and sets it as the active delivery location.
+  Future<LocationDetectResult> detectAndApplyCurrentLocation({
+    bool finishOnboarding = false,
+  }) async {
+    final result = await _locationService.detectCurrentLocation();
+    final resolved = result.resolved;
+    if (resolved != null) {
+      if (finishOnboarding) {
+        completePincode(resolved.pincode, area: resolved.displayArea);
+      } else {
+        final existingIdx =
+            _locations.indexWhere((l) => l.pincode == resolved.pincode);
+        if (existingIdx != -1) {
+          updateLocation(
+            _locations[existingIdx].copyWith(area: resolved.displayArea),
+          );
+          setDefaultLocation(_locations[existingIdx].id);
+        } else {
+          addLocation(
+            label: 'GPS',
+            pincode: resolved.pincode,
+            area: resolved.displayArea,
+            makeDefault: true,
+          );
+        }
+      }
+    }
+    return result;
   }
 
   // Actions
@@ -442,6 +936,9 @@ class SastaAppState extends ChangeNotifier {
     _hasSetPincode = true;
     _isLoggedOut = false;
     notifyListeners();
+    if (isApiConfigured) {
+      unawaited(syncCatalogForLocation());
+    }
   }
 
   void setActiveTab(int index) {
@@ -475,6 +972,9 @@ class SastaAppState extends ChangeNotifier {
       _locations[i] = _locations[i].copyWith(isDefault: _locations[i].id == id);
     }
     notifyListeners();
+    if (isApiConfigured) {
+      unawaited(syncCatalogForLocation());
+    }
   }
 
   void addLocation({
@@ -498,6 +998,9 @@ class SastaAppState extends ChangeNotifier {
       ),
     );
     notifyListeners();
+    if (makeDefault && isApiConfigured) {
+      unawaited(syncCatalogForLocation());
+    }
   }
 
   void updateLocation(SavedLocation updated) {
@@ -853,7 +1356,7 @@ class SastaAppState extends ChangeNotifier {
     String? sortBy,
   }) {
     final q = query.trim().toLowerCase();
-    final filtered = MockCatalog.products.where((p) {
+    final filtered = _products.where((p) {
       if (categoryId != null && categoryId.isNotEmpty && p.categoryId != categoryId) {
         return false;
       }
@@ -1168,6 +1671,23 @@ class SastaAppState extends ChangeNotifier {
     _hasSetPincode = false;
     _activeTabIndex = 0;
     notifyListeners();
+  }
+
+  @override
+  void notifyListeners() {
+    if (_isDisposed) return;
+    super.notifyListeners();
+    _scheduleSave();
+  }
+
+  @override
+  void dispose() {
+    _isDisposed = true;
+    _saveTimer?.cancel();
+    if (_ownsLocationService) {
+      _locationService.dispose();
+    }
+    super.dispose();
   }
 }
 

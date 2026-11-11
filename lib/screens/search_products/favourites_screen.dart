@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../app/sasta_routes.dart';
-import '../../data/mock_catalog.dart';
 import '../../data/sasta_app_state.dart';
 import '../../theme/sasta_theme.dart';
 import '../../theme/sasta_tokens.dart';
@@ -18,9 +17,8 @@ class FavouritesScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = SastaScope.of(context);
-    final favourites = MockCatalog.products
-        .where((p) => state.isFavourite(p.id))
-        .toList();
+    final favourites =
+        state.products.where((p) => state.isFavourite(p.id)).toList();
 
     final body = SafeArea(
       bottom: !isTabRoot,

@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../data/sasta_app_state.dart';
+import '../../services/pincode_location_service.dart';
 import '../../theme/sasta_theme.dart';
 import '../../theme/sasta_tokens.dart';
 import '../../widgets/product_art.dart';
@@ -25,6 +28,9 @@ class _PincodeScreenState extends State<PincodeScreen> {
   final TextEditingController _controller = TextEditingController();
   String? _errorText;
   String _selectedArea = 'Central Delhi';
+  bool _isSubmitting = false;
+  bool _isDetecting = false;
+  String? _resolvedHint;
 
   static const _quickPresets = [
     (pin: '110001', area: 'Central Delhi'),
@@ -38,30 +44,89 @@ class _PincodeScreenState extends State<PincodeScreen> {
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _lookupPreview(String text) async {
+    if (!PincodeLocationService.isValidPincode(text)) {
+      if (_resolvedHint != null) setState(() => _resolvedHint = null);
+      return;
+    }
+    final preset = _quickPresets.where((p) => p.pin == text).firstOrNull;
+    if (preset != null) {
+      setState(() {
+        _selectedArea = preset.area;
+        _resolvedHint = preset.area;
+      });
+    }
+    final state = SastaScope.read(context);
+    final resolved = await state.locationService.lookupPincode(text);
+    if (!mounted || _controller.text.trim() != text) return;
+    if (resolved != null) {
+      setState(() {
+        _selectedArea = resolved.displayArea;
+        _resolvedHint = resolved.displayArea;
+      });
+    }
+  }
+
+  Future<void> _submit() async {
+    if (_isSubmitting || _isDetecting) return;
     final text = _controller.text.trim();
-    if (text.length != 6) {
+    if (!PincodeLocationService.isValidPincode(text)) {
       setState(() => _errorText = 'Please enter a valid 6-digit pincode');
       return;
     }
-    final area = switch (text) {
+    setState(() => _isSubmitting = true);
+    final state = SastaScope.read(context);
+    final presetArea = switch (text) {
       '560001' => 'Bengaluru',
       '400001' => 'Mumbai',
-      _ => _selectedArea,
+      '110001' => 'Central Delhi',
+      _ => _resolvedHint ?? _selectedArea,
     };
-    SastaScope.read(context).completePincode(text, area: area);
+    ResolvedPincode? resolved;
+    if (_resolvedHint == null) {
+      resolved = await state.locationService.lookupPincode(text);
+    }
+    if (!mounted) return;
+    final finalArea = resolved?.displayArea ?? presetArea;
+    ScaffoldMessenger.maybeOf(context)?.clearSnackBars();
+    state.completePincode(text, area: finalArea);
+    setState(() {
+      _isSubmitting = false;
+      _selectedArea = finalArea;
+    });
     if (widget.isModalPicker && mounted) {
       Navigator.of(context).pop();
     }
   }
 
-  void _detectLocation() {
+  Future<void> _detectLocation() async {
+    if (_isDetecting || _isSubmitting) return;
     setState(() {
-      _controller.text = '110001';
-      _selectedArea = 'Central Delhi';
+      _isDetecting = true;
       _errorText = null;
     });
-    showSastaToast(context, 'Detected 110001 · Central Delhi');
+    final state = SastaScope.read(context);
+    final result = await state.locationService.detectCurrentLocation();
+    if (!mounted) return;
+    setState(() => _isDetecting = false);
+    final resolved = result.resolved;
+    if (resolved != null) {
+      setState(() {
+        _controller.text = resolved.pincode;
+        _selectedArea = resolved.displayArea;
+        _resolvedHint = resolved.displayArea;
+        _errorText = null;
+      });
+      showSastaToast(
+        context,
+        'Detected ${resolved.pincode} · ${resolved.displayArea}',
+      );
+      return;
+    }
+    setState(() {
+      _errorText = result.errorMessage ??
+          'Unable to detect location. Please enter your pincode.';
+    });
   }
 
   @override
@@ -150,10 +215,11 @@ class _PincodeScreenState extends State<PincodeScreen> {
                                 FilteringTextInputFormatter.digitsOnly,
                                 LengthLimitingTextInputFormatter(6),
                               ],
-                              onChanged: (_) {
+                              onChanged: (value) {
                                 if (_errorText != null) {
                                   setState(() => _errorText = null);
                                 }
+                                unawaited(_lookupPreview(value));
                               },
                               onSubmitted: (_) => _submit(),
                               style: SastaText.body(
@@ -177,6 +243,33 @@ class _PincodeScreenState extends State<PincodeScreen> {
                         ],
                       ),
                     ),
+                    if (_resolvedHint != null && _errorText == null) ...[
+                      const SizedBox(height: 8),
+                      Padding(
+                        padding: const EdgeInsets.only(left: 10),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.check_circle_rounded,
+                              size: 15,
+                              color: palette.successText,
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                'Serviceable area: $_resolvedHint',
+                                style: SastaText.body(
+                                  context,
+                                  size: 12,
+                                  weight: FontWeight.w600,
+                                  color: palette.successText,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                     if (_errorText != null) ...[
                       const SizedBox(height: 6),
                       Padding(
@@ -204,6 +297,7 @@ class _PincodeScreenState extends State<PincodeScreen> {
                           onTap: () => setState(() {
                             _controller.text = preset.pin;
                             _selectedArea = preset.area;
+                            _resolvedHint = preset.area;
                             _errorText = null;
                           }),
                         );
@@ -212,26 +306,39 @@ class _PincodeScreenState extends State<PincodeScreen> {
                     const Spacer(),
                     const SizedBox(height: 20),
                     SastaPrimaryButton(
-                      label: 'Continue',
-                      onPressed: () {
-                        if (_controller.text.trim().isEmpty &&
-                            !widget.isModalPicker) {
-                          _controller.text = state.activeLocation.pincode;
-                        }
-                        _submit();
-                      },
+                      label: _isSubmitting ? 'Checking pincode…' : 'Continue',
+                      onPressed: _isSubmitting
+                          ? null
+                          : () {
+                              if (_controller.text.trim().isEmpty &&
+                                  !widget.isModalPicker) {
+                                _controller.text = state.activeLocation.pincode;
+                              }
+                              _submit();
+                            },
                     ),
                     const SizedBox(height: 6),
                     Center(
                       child: TextButton.icon(
-                        onPressed: _detectLocation,
+                        onPressed: _isDetecting ? null : _detectLocation,
                         style: TextButton.styleFrom(
                           minimumSize: const Size(160, 48),
                           foregroundColor: palette.ink,
                         ),
-                        icon: const Icon(Icons.my_location_rounded, size: 18),
+                        icon: _isDetecting
+                            ? SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: palette.ink,
+                                ),
+                              )
+                            : const Icon(Icons.my_location_rounded, size: 18),
                         label: Text(
-                          'Use my current location',
+                          _isDetecting
+                              ? 'Detecting location…'
+                              : 'Use my current location',
                           style: SastaText.body(
                             context,
                             size: 15,

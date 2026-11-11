@@ -123,7 +123,7 @@ class BasketScreen extends StatelessWidget {
     final unavailableCount = comparison.unavailableProducts.length;
 
     final basketIds = basket.entries.map((e) => e.productId).toSet();
-    final suggestions = MockCatalog.products
+    final suggestions = state.products
         .where((p) =>
             !basketIds.contains(p.id) &&
             !state.dismissedSuggestionIds.contains(p.id))
@@ -1231,10 +1231,10 @@ class _EmptyBasketView extends StatelessWidget {
               scrollDirection: Axis.horizontal,
               physics: const BouncingScrollPhysics(),
               clipBehavior: Clip.none,
-              itemCount: 4,
+              itemCount: state.products.length.clamp(0, 4),
               separatorBuilder: (_, _) => const SizedBox(width: 10),
               itemBuilder: (context, i) {
-                final p = MockCatalog.products[i];
+                final p = state.products[i];
                 final q = p.cheapestQuote(p.defaultVariantIndex);
                 return SastaCard(
                   color: context.sasta.pastel(p.pastel),

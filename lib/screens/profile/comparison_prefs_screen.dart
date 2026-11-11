@@ -7,8 +7,69 @@ import '../../theme/sasta_tokens.dart';
 import '../../widgets/sasta_background.dart';
 import '../../widgets/sasta_components.dart';
 
-class ComparisonPrefsScreen extends StatelessWidget {
+class ComparisonPrefsScreen extends StatefulWidget {
   const ComparisonPrefsScreen({super.key});
+
+  @override
+  State<ComparisonPrefsScreen> createState() => _ComparisonPrefsScreenState();
+}
+
+class _ComparisonPrefsScreenState extends State<ComparisonPrefsScreen> {
+  late final TextEditingController _baseUrlCtrl;
+  late final TextEditingController _apiKeyCtrl;
+  bool _initialized = false;
+  bool _savingApi = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _baseUrlCtrl = TextEditingController();
+    _apiKeyCtrl = TextEditingController();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initialized) {
+      final state = SastaScope.read(context);
+      _baseUrlCtrl.text = state.apiBaseUrl;
+      _apiKeyCtrl.text = state.apiKey;
+      _initialized = true;
+    }
+  }
+
+  @override
+  void dispose() {
+    _baseUrlCtrl.dispose();
+    _apiKeyCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _saveAndSyncApi() async {
+    if (_savingApi) return;
+    setState(() => _savingApi = true);
+    final state = SastaScope.read(context);
+    final synced = await state.updateApiConfig(
+      baseUrl: _baseUrlCtrl.text,
+      apiKey: _apiKeyCtrl.text,
+      syncNow: true,
+    );
+    if (!mounted) return;
+    setState(() => _savingApi = false);
+    if (!state.isApiConfigured) {
+      showSastaToast(context, 'Cleared API endpoint · using local catalog cache');
+    } else if (synced) {
+      showSastaToast(
+        context,
+        'Synced ${state.products.length} products for ${state.activeLocation.pincode}',
+      );
+    } else {
+      showSastaToast(
+        context,
+        state.lastSyncError ?? 'Saved API settings · sync failed',
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -163,6 +224,81 @@ class ComparisonPrefsScreen extends StatelessWidget {
                     ],
                   ),
                 ),
+                const SizedBox(height: 22),
+                Text('QUICK-COMMERCE API', style: SastaText.eyebrow(context)),
+                const SizedBox(height: 8),
+                SastaCard(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            state.isLiveCatalogActive
+                                ? Icons.cloud_done_rounded
+                                : Icons.cloud_queue_rounded,
+                            size: 18,
+                            color: state.isLiveCatalogActive
+                                ? palette.successText
+                                : palette.muted,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              state.isLiveCatalogActive
+                                  ? 'Live catalog active'
+                                  : (state.isApiConfigured
+                                      ? 'API configured · ready to sync'
+                                      : 'Using cached local catalog'),
+                              style: SastaText.body(
+                                context,
+                                size: 13,
+                                weight: FontWeight.w700,
+                                color: state.isLiveCatalogActive
+                                    ? palette.successText
+                                    : palette.ink,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (state.lastSyncError != null) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          state.lastSyncError!,
+                          style: SastaText.body(
+                            context,
+                            size: 12,
+                            color: palette.dangerText,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 12),
+                      _ApiTextField(
+                        controller: _baseUrlCtrl,
+                        hint: 'https://api.yourdomain.com',
+                        label: 'API Base URL',
+                      ),
+                      const SizedBox(height: 10),
+                      _ApiTextField(
+                        controller: _apiKeyCtrl,
+                        hint: 'Optional Bearer / X-API-Key',
+                        label: 'API Key',
+                      ),
+                      const SizedBox(height: 12),
+                      SastaOutlineButton(
+                        label: (_savingApi || state.isCatalogSyncing)
+                            ? 'Syncing live prices…'
+                            : 'Save & sync live prices',
+                        height: 44,
+                        onPressed: (_savingApi || state.isCatalogSyncing)
+                            ? null
+                            : _saveAndSyncApi,
+                      ),
+                    ],
+                  ),
+                ),
                 const SizedBox(height: 24),
                 SastaPrimaryButton(
                   label: 'Save preferences',
@@ -237,6 +373,60 @@ class _PrefToggleRow extends StatelessWidget {
           SastaSwitch(value: value, onChanged: onChanged),
         ],
       ),
+    );
+  }
+}
+
+class _ApiTextField extends StatelessWidget {
+  const _ApiTextField({
+    required this.controller,
+    required this.label,
+    required this.hint,
+  });
+
+  final TextEditingController controller;
+  final String label;
+  final String hint;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.sasta;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: SastaText.body(
+            context,
+            size: 12,
+            weight: FontWeight.w700,
+            color: palette.muted,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Container(
+          height: 46,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          decoration: BoxDecoration(
+            color: palette.field,
+            borderRadius: BorderRadius.circular(18),
+          ),
+          alignment: Alignment.center,
+          child: TextField(
+            controller: controller,
+            keyboardType: TextInputType.url,
+            autocorrect: false,
+            enableSuggestions: false,
+            style: SastaText.body(context, size: 13, weight: FontWeight.w600),
+            decoration: InputDecoration(
+              border: InputBorder.none,
+              isDense: true,
+              hintText: hint,
+              hintStyle: SastaText.muted(context, size: 13),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
