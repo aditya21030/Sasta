@@ -90,12 +90,15 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                       Center(
                         child: FloatBob(
                           amplitude: 6,
-                          child: SizedBox(
-                            width: 240,
-                            height: 210,
-                            child: Stack(
-                              alignment: Alignment.center,
-                              children: [
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: SizedBox(
+                              width: 240,
+                              height: 210,
+                              child: Stack(
+                                alignment: Alignment.center,
+                                clipBehavior: Clip.hardEdge,
+                                children: [
                                 Container(
                                   width: 204,
                                   height: 204,
@@ -150,6 +153,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                                   ),
                                 ),
                               ],
+                              ),
                             ),
                           ),
                         ),
@@ -174,18 +178,30 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                               ],
                             ),
                           ),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Text(
-                                'Lowest',
-                                style: SastaText.muted(context, size: 12),
-                              ),
-                              PriceGradientText(
-                                cheapest != null ? '₹${cheapest.price}' : '—',
-                                size: 36,
-                              ),
-                            ],
+                          Flexible(
+                            flex: 0,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text(
+                                  'Lowest',
+                                  style: SastaText.muted(context, size: 12),
+                                ),
+                                ConstrainedBox(
+                                  constraints: const BoxConstraints(
+                                    maxWidth: 132,
+                                  ),
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.centerRight,
+                                    child: PriceGradientText(
+                                      cheapest != null ? '₹${cheapest.price}' : '—',
+                                      size: 36,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),

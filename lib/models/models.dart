@@ -11,6 +11,7 @@ enum RetailerId {
     color: SastaColors.blinkit,
     deliveryFee: 25,
     schemeUrl: 'blinkit://search',
+    assetPath: 'assets/icons/retailers/blinkit.png',
   ),
   zepto(
     id: 'zepto',
@@ -20,6 +21,7 @@ enum RetailerId {
     color: SastaColors.zepto,
     deliveryFee: 20,
     schemeUrl: 'zepto://search',
+    assetPath: 'assets/icons/retailers/zepto.png',
   ),
   instamart(
     id: 'instamart',
@@ -29,6 +31,7 @@ enum RetailerId {
     color: SastaColors.instamart,
     deliveryFee: 29,
     schemeUrl: 'swiggy://instamart',
+    assetPath: 'assets/icons/retailers/instamart.png',
   ),
   flipkartMinutes(
     id: 'flipkart_minutes',
@@ -38,6 +41,7 @@ enum RetailerId {
     color: SastaColors.flipkartMinutes,
     deliveryFee: 20,
     schemeUrl: 'flipkart://minutes',
+    assetPath: 'assets/icons/retailers/flipkart_minutes.png',
   );
 
   const RetailerId({
@@ -48,6 +52,7 @@ enum RetailerId {
     required this.color,
     required this.deliveryFee,
     required this.schemeUrl,
+    required this.assetPath,
   });
 
   final String id;
@@ -57,6 +62,7 @@ enum RetailerId {
   final Color color;
   final int deliveryFee;
   final String schemeUrl;
+  final String assetPath;
 
   static RetailerId? tryParse(String? raw) {
     if (raw == null || raw.isEmpty) return null;

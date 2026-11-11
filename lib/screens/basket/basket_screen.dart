@@ -135,15 +135,21 @@ class BasketScreen extends StatelessWidget {
         SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(
-            SastaSpace.page,
+            0,
             14,
-            SastaSpace.page,
+            0,
             SastaSpace.basketBarClearance,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: SastaSpace.page),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
                 children: [
                   Expanded(
                     child: Text(
@@ -298,13 +304,20 @@ class BasketScreen extends StatelessWidget {
                 hintText: 'Search groceries, brands…',
                 onTap: () => SastaNav.openHomeSearch(context),
               ),
+                  ],
+                ),
+              ),
               const SizedBox(height: 10),
-              SizedBox(
-                height: 44,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  physics: const BouncingScrollPhysics(),
-                  clipBehavior: Clip.none,
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(
+                  SastaSpace.page,
+                  2,
+                  SastaSpace.page,
+                  6,
+                ),
+                child: Row(
                   children: [
                     SastaChip(
                       label: 'Favourites',
@@ -336,6 +349,12 @@ class BasketScreen extends StatelessWidget {
                   ],
                 ),
               ),
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: SastaSpace.page),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
               const SizedBox(height: 22),
               Row(
                 children: [
@@ -752,14 +771,14 @@ class BasketScreen extends StatelessWidget {
                             runSpacing: 6,
                             children: [
                               SastaTag(
-                                label: 'Single store',
+                                label: '1 Store',
                                 backgroundColor: palette.isDark
                                     ? palette.surface
                                     : Colors.white,
                                 textColor: palette.ink,
                               ),
                               SastaTag(
-                                label: 'Split basket',
+                                label: 'Mix Stores',
                                 backgroundColor: palette.isDark
                                     ? palette.surface
                                     : Colors.white,
@@ -806,137 +825,203 @@ class BasketScreen extends StatelessWidget {
                   ),
                 ],
               ),
+                  ],
+                ),
+              ),
               const SizedBox(height: 10),
-              SizedBox(
-                height: 162,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  physics: const BouncingScrollPhysics(),
-                  clipBehavior: Clip.none,
-                  itemCount: state.savedBaskets.length,
-                  separatorBuilder: (_, _) => const SizedBox(width: 10),
-                  itemBuilder: (context, i) {
-                    final sb = state.savedBaskets[i];
-                    final isCurrent = sb.id == basket.id;
-                    return SastaCard(
-                      color: palette.pastel(sb.pastel),
-                      shadow: false,
-                      child: SizedBox(
-                        width: 210,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (isCurrent)
-                              SastaTag(
-                                label: 'Current',
-                                backgroundColor: palette.ink,
-                                textColor: palette.primaryCtaFg,
-                              )
-                            else
-                              const SizedBox(height: 18),
-                            const SizedBox(height: 6),
-                            Text(
-                              sb.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: SastaText.body(
-                                context,
-                                size: 15,
-                                weight: FontWeight.w700,
-                              ),
-                            ),
-                            Text(
-                              '${sb.uniqueProducts} products · ${sb.updatedLabel}',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: SastaText.muted(context, size: 12),
-                            ),
-                            const Spacer(),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: SastaPrimaryButton(
-                                    label: isCurrent ? 'Compare' : 'Open',
-                                    height: 36,
-                                    onPressed: () {
-                                      if (isCurrent) {
-                                        SastaNav.openBasketCompare(context);
-                                      } else {
-                                        state.selectActiveBasket(sb.id);
-                                      }
-                                    },
-                                  ),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(
+                  SastaSpace.page,
+                  2,
+                  SastaSpace.page,
+                  6,
+                ),
+                child: IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      for (var i = 0; i < state.savedBaskets.length; i++) ...[
+                        if (i > 0) const SizedBox(width: 10),
+                        Builder(
+                          builder: (context) {
+                            final sb = state.savedBaskets[i];
+                            final isCurrent = sb.id == basket.id;
+                            return SastaCard(
+                              color: palette.pastel(sb.pastel),
+                              shadow: false,
+                              child: SizedBox(
+                                width: 210,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        if (isCurrent)
+                                          SastaTag(
+                                            label: 'Current',
+                                            backgroundColor: palette.ink,
+                                            textColor: palette.primaryCtaFg,
+                                          )
+                                        else
+                                          const SizedBox(height: 18),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          sb.name,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: SastaText.body(
+                                            context,
+                                            size: 15,
+                                            weight: FontWeight.w700,
+                                          ),
+                                        ),
+                                        Text(
+                                          '${sb.uniqueProducts} products · ${sb.updatedLabel}',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: SastaText.muted(
+                                            context,
+                                            size: 12,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: SastaPrimaryButton(
+                                            label:
+                                                isCurrent ? 'Compare' : 'Open',
+                                            height: 36,
+                                            onPressed: () {
+                                              if (isCurrent) {
+                                                SastaNav.openBasketCompare(
+                                                    context);
+                                              } else {
+                                                state.selectActiveBasket(sb.id);
+                                              }
+                                            },
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
                                 ),
-                              ],
-                            ),
-                          ],
+                              ),
+                            );
+                          },
                         ),
-                      ),
-                    );
-                  },
+                      ],
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(height: 12),
-              SastaOutlineButton(
-                label: '+ Create new basket',
-                height: 48,
-                onPressed: () => showCreateBasketDialog(context),
-              ),
-              const SizedBox(height: 22),
-              Text(
-                'Quick start with a basket',
-                style: SastaText.display(context, size: 20),
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: SastaSpace.page),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const SizedBox(height: 12),
+                    SastaOutlineButton(
+                      label: '+ Create new basket',
+                      height: 48,
+                      onPressed: () => showCreateBasketDialog(context),
+                    ),
+                    const SizedBox(height: 22),
+                    Text(
+                      'Quick start with a basket',
+                      style: SastaText.display(context, size: 20),
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(height: 10),
-              SizedBox(
-                height: 146,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  physics: const BouncingScrollPhysics(),
-                  clipBehavior: Clip.none,
-                  itemCount: MockCatalog.templates.length,
-                  separatorBuilder: (_, _) => const SizedBox(width: 10),
-                  itemBuilder: (context, i) {
-                    final t = MockCatalog.templates[i];
-                    return SastaCard(
-                      color: palette.pastel(t.pastel),
-                      shadow: false,
-                      child: SizedBox(
-                        width: 184,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              t.title,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: SastaText.body(
-                                context,
-                                size: 14,
-                                weight: FontWeight.w700,
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(
+                  SastaSpace.page,
+                  2,
+                  SastaSpace.page,
+                  6,
+                ),
+                child: IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      for (var i = 0; i < MockCatalog.templates.length; i++) ...[
+                        if (i > 0) const SizedBox(width: 10),
+                        Builder(
+                          builder: (context) {
+                            final t = MockCatalog.templates[i];
+                            return SastaCard(
+                              color: palette.pastel(t.pastel),
+                              shadow: false,
+                              child: SizedBox(
+                                width: 184,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          t.title,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: SastaText.body(
+                                            context,
+                                            size: 14,
+                                            weight: FontWeight.w700,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          '${t.productIds.length} products',
+                                          style: SastaText.muted(
+                                            context,
+                                            size: 12,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 10),
+                                    SastaChip(
+                                      label: 'Preview',
+                                      selected: true,
+                                      height: 36,
+                                      onTap: () =>
+                                          showTemplatePreviewSheet(context, t),
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              '${t.productIds.length} products',
-                              style: SastaText.muted(context, size: 12),
-                            ),
-                            const Spacer(),
-                            SastaChip(
-                              label: 'Preview',
-                              selected: true,
-                              height: 36,
-                              onTap: () =>
-                                  showTemplatePreviewSheet(context, t),
-                            ),
-                          ],
+                            );
+                          },
                         ),
-                      ),
-                    );
-                  },
+                      ],
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(height: 22),
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: SastaSpace.page),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const SizedBox(height: 22),
               Text(
                 'Recent basket activity',
                 style: SastaText.display(context, size: 20),
@@ -1006,101 +1091,145 @@ class BasketScreen extends StatelessWidget {
                     ],
                   ),
                 ),
+                  ],
+                ),
+              ),
               if (suggestions.isNotEmpty) ...[
-                const SizedBox(height: 22),
-                Text(
-                  'Complete your basket',
-                  style: SastaText.display(context, size: 20),
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: SastaSpace.page),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const SizedBox(height: 22),
+                      Text(
+                        'Complete your basket',
+                        style: SastaText.display(context, size: 20),
+                      ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 10),
-                SizedBox(
-                  height: 206,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    physics: const BouncingScrollPhysics(),
-                    clipBehavior: Clip.none,
-                    itemCount: suggestions.length,
-                    separatorBuilder: (_, _) => const SizedBox(width: 10),
-                    itemBuilder: (context, i) {
-                      final s = suggestions[i];
-                      final q = s.cheapestQuote(s.defaultVariantIndex);
-                      return SastaCard(
-                        color: palette.pastel(s.pastel),
-                        shadow: false,
-                        child: SizedBox(
-                          width: 170,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Center(
-                                child: ProductArtTile(
-                                  kind: s.artKind,
-                                  pastel: s.pastel,
-                                  size: 56,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                s.name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: SastaText.body(
-                                  context,
-                                  size: 14,
-                                  weight: FontWeight.w700,
-                                ),
-                              ),
-                              Text(
-                                q != null ? '₹${q.price} · ${q.retailer.shortName}' : '—',
-                                style: SastaText.muted(context, size: 12),
-                              ),
-                              const Spacer(),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: SastaPrimaryButton(
-                                      label: 'Add',
-                                      height: 36,
-                                      onPressed: () {
-                                        state.addToBasket(s.id);
-                                        showSastaToast(
-                                          context,
-                                          'Added ${s.name}',
-                                        );
-                                      },
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  InkWell(
-                                    onTap: () =>
-                                        state.dismissBasketSuggestion(s.id),
-                                    customBorder: const CircleBorder(),
-                                    child: Container(
-                                      width: 34,
-                                      height: 34,
-                                      decoration: BoxDecoration(
-                                        color: palette.isDark
-                                            ? palette.surface
-                                            : Colors.white,
-                                        shape: BoxShape.circle,
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(
+                    SastaSpace.page,
+                    2,
+                    SastaSpace.page,
+                    6,
+                  ),
+                  child: IntrinsicHeight(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        for (var i = 0; i < suggestions.length; i++) ...[
+                          if (i > 0) const SizedBox(width: 10),
+                          Builder(
+                            builder: (context) {
+                              final s = suggestions[i];
+                              final q = s.cheapestQuote(s.defaultVariantIndex);
+                              return SastaCard(
+                                color: palette.pastel(s.pastel),
+                                shadow: false,
+                                child: SizedBox(
+                                  width: 170,
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Center(
+                                            child: ProductArtTile(
+                                              kind: s.artKind,
+                                              pastel: s.pastel,
+                                              size: 56,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 6),
+                                          Text(
+                                            s.name,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: SastaText.body(
+                                              context,
+                                              size: 14,
+                                              weight: FontWeight.w700,
+                                            ),
+                                          ),
+                                          Text(
+                                            q != null
+                                                ? '₹${q.price} · ${q.retailer.shortName}'
+                                                : '—',
+                                            style: SastaText.muted(
+                                              context,
+                                              size: 12,
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                      child: Icon(
-                                        Icons.close_rounded,
-                                        size: 16,
-                                        color: palette.ink,
+                                      const SizedBox(height: 10),
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: SastaPrimaryButton(
+                                              label: 'Add',
+                                              height: 36,
+                                              onPressed: () {
+                                                state.addToBasket(s.id);
+                                                showSastaToast(
+                                                  context,
+                                                  'Added ${s.name}',
+                                                );
+                                              },
+                                            ),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          InkWell(
+                                            onTap: () => state
+                                                .dismissBasketSuggestion(s.id),
+                                            customBorder: const CircleBorder(),
+                                            child: Container(
+                                              width: 34,
+                                              height: 34,
+                                              decoration: BoxDecoration(
+                                                color: palette.isDark
+                                                    ? palette.surface
+                                                    : Colors.white,
+                                                shape: BoxShape.circle,
+                                              ),
+                                              child: Icon(
+                                                Icons.close_rounded,
+                                                size: 16,
+                                                color: palette.ink,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                    ),
+                                    ],
                                   ),
-                                ],
-                              ),
-                            ],
+                                ),
+                              );
+                            },
                           ),
-                        ),
-                      );
-                    },
+                        ],
+                      ],
+                    ),
                   ),
                 ),
               ],
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: SastaSpace.page),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
               const SizedBox(height: 22),
               Text(
                 'Share your shopping list',
@@ -1150,6 +1279,9 @@ class BasketScreen extends StatelessWidget {
                   ),
                 ],
               ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
@@ -1178,14 +1310,19 @@ class _EmptyBasketView extends StatelessWidget {
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(
-        SastaSpace.page,
+        0,
         14,
-        SastaSpace.page,
+        0,
         SastaSpace.navClearance,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: SastaSpace.page),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
           Row(
             children: [
               Expanded(
@@ -1216,7 +1353,7 @@ class _EmptyBasketView extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Start adding products to "${basket.name}" to see the cheapest store and split options.',
+            'Start adding products to "${basket.name}" to see which store is cheapest.',
             textAlign: TextAlign.center,
             style: SastaText.muted(context, size: 14),
           ),
@@ -1235,60 +1372,81 @@ class _EmptyBasketView extends StatelessWidget {
             'Popular products',
             style: SastaText.display(context, size: 20),
           ),
+              ],
+            ),
+          ),
           const SizedBox(height: 10),
-          SizedBox(
-            height: 146,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              physics: const BouncingScrollPhysics(),
-              clipBehavior: Clip.none,
-              itemCount: state.products.length.clamp(0, 4),
-              separatorBuilder: (_, _) => const SizedBox(width: 10),
-              itemBuilder: (context, i) {
-                final p = state.products[i];
-                final q = p.cheapestQuote(p.defaultVariantIndex);
-                return SastaCard(
-                  color: context.sasta.pastel(p.pastel),
-                  shadow: false,
-                  child: SizedBox(
-                    width: 154,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            ProductArtTile(
-                              kind: p.artKind,
-                              pastel: p.pastel,
-                              size: 44,
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(
+              SastaSpace.page,
+              2,
+              SastaSpace.page,
+              6,
+            ),
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (var i = 0; i < state.products.length.clamp(0, 4); i++) ...[
+                    if (i > 0) const SizedBox(width: 10),
+                    Builder(
+                      builder: (context) {
+                        final p = state.products[i];
+                        final q = p.cheapestQuote(p.defaultVariantIndex);
+                        return SastaCard(
+                          color: context.sasta.pastel(p.pastel),
+                          shadow: false,
+                          child: SizedBox(
+                            width: 154,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: [
+                                    ProductArtTile(
+                                      kind: p.artKind,
+                                      pastel: p.pastel,
+                                      size: 44,
+                                    ),
+                                    const Spacer(),
+                                    IconButton(
+                                      onPressed: () => state.addToBasket(p.id),
+                                      icon: const Icon(Icons.add_circle_rounded),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      p.name,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: SastaText.body(
+                                        context,
+                                        size: 13,
+                                        weight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    Text(
+                                      q != null ? '₹${q.price}' : '—',
+                                      style: SastaText.display(context, size: 18),
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ),
-                            const Spacer(),
-                            IconButton(
-                              onPressed: () => state.addToBasket(p.id),
-                              icon: const Icon(Icons.add_circle_rounded),
-                            ),
-                          ],
-                        ),
-                        const Spacer(),
-                        Text(
-                          p.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: SastaText.body(
-                            context,
-                            size: 13,
-                            weight: FontWeight.w700,
                           ),
-                        ),
-                        Text(
-                          q != null ? '₹${q.price}' : '—',
-                          style: SastaText.display(context, size: 18),
-                        ),
-                      ],
+                        );
+                      },
                     ),
-                  ),
-                );
-              },
+                  ],
+                ],
+              ),
             ),
           ),
         ],

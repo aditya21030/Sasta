@@ -82,22 +82,21 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   ),
                 ),
                 const SizedBox(height: 14),
-                SizedBox(
-                  height: 44,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    physics: const BouncingScrollPhysics(),
-                    clipBehavior: Clip.none,
-                    itemCount: _filters.length,
-                    separatorBuilder: (_, _) => const SizedBox(width: 8),
-                    itemBuilder: (context, i) {
-                      final f = _filters[i];
-                      return SastaChip(
-                        label: f,
-                        selected: _filter == f,
-                        onTap: () => setState(() => _filter = f),
-                      );
-                    },
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Row(
+                    children: [
+                      for (var i = 0; i < _filters.length; i++) ...[
+                        if (i > 0) const SizedBox(width: 8),
+                        SastaChip(
+                          label: _filters[i],
+                          selected: _filter == _filters[i],
+                          onTap: () => setState(() => _filter = _filters[i]),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
                 const SizedBox(height: 14),

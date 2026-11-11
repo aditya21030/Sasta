@@ -69,12 +69,12 @@ class _BasketCompareScreenState extends State<BasketCompareScreen> {
                       child: Row(
                         children: [
                           _SegTab(
-                            label: 'Single store',
+                            label: '1 Store',
                             selected: _tabIndex == 0,
                             onTap: () => setState(() => _tabIndex = 0),
                           ),
                           _SegTab(
-                            label: 'Split basket',
+                            label: 'Mix Stores',
                             selected: _tabIndex == 1,
                             onTap: () => setState(() => _tabIndex = 1),
                           ),
@@ -237,15 +237,22 @@ class _SingleStoreBody extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         SastaTag(
-                          label: 'Cheapest complete basket',
+                          label: 'Cheapest on 1 app',
                           backgroundColor: palette.mint,
                           textColor: palette.successText,
                         ),
                         const SizedBox(height: 8),
-                        PriceGradientText('₹${winner.totalPrice}', size: 48),
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: PriceGradientText(
+                            '₹${winner.totalPrice}',
+                            size: 48,
+                          ),
+                        ),
                         const SizedBox(height: 2),
                         Text(
-                          'on ${winner.retailer.name} · estimated',
+                          '${winner.retailer.name} · est. item total',
                           style: SastaText.body(
                             context,
                             size: 14,
@@ -255,12 +262,13 @@ class _SingleStoreBody extends StatelessWidget {
                       ],
                     ),
                   ),
+                  const SizedBox(width: 10),
                   FloatBob(
                     amplitude: 5,
-                    child: SastaMascot(
-                      size: 86,
-                      color: winner.retailer.color,
-                      expression: MascotExpression.joy,
+                    child: RetailerAvatar(
+                      retailer: winner.retailer,
+                      size: 76,
+                      showBorder: true,
                     ),
                   ),
                 ],
@@ -363,15 +371,15 @@ class _SplitBasketBody extends StatelessWidget {
                     children: [
                       Text(
                         splitWorthIt
-                            ? 'Split saves ₹$splitSavings!'
-                            : 'Splitting isn’t worth it here',
+                            ? 'Mix apps to save ₹$splitSavings'
+                            : 'Better in 1 store',
                         style: SastaText.display(context, size: 20),
                       ),
                       const SizedBox(height: 6),
                       Text(
                         splitWorthIt
-                            ? 'Splitting across ${comparison.splitSlices.length} stores saves ₹$splitSavings after considering item prices.'
-                            : 'It saves ₹$splitSavings on items but adds a second order and delivery fee.',
+                            ? 'Ordering across ${comparison.splitSlices.length} apps saves ₹$splitSavings on item prices.'
+                            : 'Mixing apps saves ₹$splitSavings on items, which may get used up by a second delivery fee.',
                         style: SastaText.body(
                           context,
                           size: 13,
@@ -511,19 +519,23 @@ class _SavingsBody extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Estimated savings',
+                        'Potential savings',
                         style: SastaText.body(
                           context,
                           size: 13,
                           weight: FontWeight.w700,
                         ),
                       ),
-                      PriceGradientText(
-                        '₹${comparison.savingsVsPriciest}',
-                        size: 52,
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: PriceGradientText(
+                          '₹${comparison.savingsVsPriciest}',
+                          size: 52,
+                        ),
                       ),
                       Text(
-                        '${comparison.percentSavedVsPriciest}% less than the priciest complete basket',
+                        '${comparison.percentSavedVsPriciest}% less than the costliest app',
                         style: SastaText.body(
                           context,
                           size: 13,
@@ -557,7 +569,7 @@ class _SavingsBody extends StatelessWidget {
                 children: [
                   Expanded(
                     child: _CompareBar(
-                      label: 'Best single',
+                      label: '1 Store',
                       amount: '₹$bestSingle',
                       ratio: bestSingle / maxBar,
                       color: SastaColors.instamart,
@@ -566,7 +578,7 @@ class _SavingsBody extends StatelessWidget {
                   const SizedBox(width: 12),
                   Expanded(
                     child: _CompareBar(
-                      label: 'Split*',
+                      label: 'Mix*',
                       amount: '₹${comparison.splitTotal}*',
                       ratio: comparison.splitTotal / maxBar,
                       color: SastaColors.chartLinePurple,
@@ -575,7 +587,7 @@ class _SavingsBody extends StatelessWidget {
                   const SizedBox(width: 12),
                   Expanded(
                     child: _CompareBar(
-                      label: 'Priciest',
+                      label: 'Costliest',
                       amount: '₹$priciest',
                       ratio: 1.0,
                       color: SastaColors.mutedGrey,
@@ -585,7 +597,7 @@ class _SavingsBody extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               Text(
-                '*Split total excludes extra delivery fees from ordering across multiple apps.',
+                '*Mix total counts groceries only. Ordering from 2+ apps adds extra delivery fees.',
                 style: SastaText.muted(context, size: 11),
               ),
             ],
@@ -657,9 +669,12 @@ class _CompareBar extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          amount,
-          style: SastaText.body(context, size: 13, weight: FontWeight.w800),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            amount,
+            style: SastaText.body(context, size: 13, weight: FontWeight.w800),
+          ),
         ),
         const SizedBox(height: 6),
         Container(
@@ -671,7 +686,10 @@ class _CompareBar extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 6),
-        Text(label, style: SastaText.muted(context, size: 12)),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(label, style: SastaText.muted(context, size: 12)),
+        ),
       ],
     );
   }

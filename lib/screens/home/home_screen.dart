@@ -30,16 +30,17 @@ class HomeScreen extends StatelessWidget {
           parent: BouncingScrollPhysics(),
         ),
         padding: const EdgeInsets.fromLTRB(
-          SastaSpace.page,
+          0,
           14,
-          SastaSpace.page,
+          0,
           SastaSpace.navClearance,
         ),
         child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Top app bar: brand + pincode pill + notification bell
-          Row(
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: SastaSpace.page),
+            child: Row(
             children: [
               Expanded(
                 child: Row(
@@ -118,135 +119,152 @@ class HomeScreen extends StatelessWidget {
               ),
             ],
           ),
+          ),
           const SizedBox(height: 18),
           if (state.homeOfflineError) ...[
-            const _HomeOfflineSection(),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: SastaSpace.page),
+              child: _HomeOfflineSection(),
+            ),
           ] else ...[
-            FadeUp(
-              child: Text(
-                'What are we\nsaving on today?',
-                style: SastaText.display(context, size: 35),
-              ),
-            ),
-            const SizedBox(height: 16),
-            FadeUp(
-              delay: const Duration(milliseconds: 50),
-              child: SastaSearchPill(
-                readOnly: true,
-                onTap: () => SastaNav.openHomeSearch(context),
-              ),
-            ),
-            if (state.isCatalogSyncing ||
-                state.isLiveCatalogActive ||
-                state.lastSyncError != null) ...[
-              const SizedBox(height: 10),
-              GestureDetector(
-                onTap: () =>
-                    SastaNav.push(context, SastaRouteNames.comparisonPrefs),
-                child: Row(
-                  children: [
-                    Icon(
-                      state.lastSyncError != null
-                          ? Icons.sync_problem_rounded
-                          : (state.isCatalogSyncing
-                              ? Icons.sync_rounded
-                              : Icons.cloud_done_rounded),
-                      size: 14,
-                      color: state.lastSyncError != null
-                          ? palette.dangerText
-                          : (state.isLiveCatalogActive
-                              ? palette.successText
-                              : palette.muted),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: SastaSpace.page),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  FadeUp(
+                    child: Text(
+                      'What are we\nsaving on today?',
+                      style: SastaText.display(context, size: 35),
                     ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        state.isCatalogSyncing
-                            ? 'Syncing live prices for ${state.activeLocation.pincode}…'
-                            : (state.lastSyncError != null
-                                ? 'Live sync paused · showing cached prices'
-                                : 'Live API prices active · ${state.activeLocation.area}'),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: SastaText.body(
-                          context,
-                          size: 12,
-                          weight: FontWeight.w600,
-                          color: state.lastSyncError != null
-                              ? palette.dangerText
-                              : (state.isLiveCatalogActive
-                                  ? palette.successText
-                                  : palette.muted),
-                        ),
+                  ),
+                  const SizedBox(height: 16),
+                  FadeUp(
+                    delay: const Duration(milliseconds: 50),
+                    child: SastaSearchPill(
+                      readOnly: true,
+                      onTap: () => SastaNav.openHomeSearch(context),
+                    ),
+                  ),
+                  if (state.isCatalogSyncing || state.isLiveCatalogActive) ...[
+                    const SizedBox(height: 10),
+                    GestureDetector(
+                      onTap: () => SastaNav.push(
+                        context,
+                        SastaRouteNames.comparisonPrefs,
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            state.isCatalogSyncing
+                                ? Icons.sync_rounded
+                                : Icons.cloud_done_rounded,
+                            size: 14,
+                            color: state.isLiveCatalogActive
+                                ? palette.successText
+                                : palette.muted,
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              state.isCatalogSyncing
+                                  ? 'Checking store prices for ${state.activeLocation.pincode}…'
+                                  : 'Live prices updated · ${state.activeLocation.area}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: SastaText.body(
+                                context,
+                                size: 12,
+                                weight: FontWeight.w600,
+                                color: state.isLiveCatalogActive
+                                    ? palette.successText
+                                    : palette.muted,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
-                ),
+                  if (state.firstTimeUserMode) ...[
+                    const SizedBox(height: 18),
+                    _WelcomeBannerCard(
+                      onDismiss: () => state.setFirstTimeUserMode(false),
+                    ),
+                  ],
+                  const SizedBox(height: 24),
+                  _SectionHeader(
+                    title: 'Shop by category',
+                    actionLabel: 'View all',
+                    onAction: () => SastaNav.openCategories(context),
+                  ),
+                ],
               ),
-            ],
-            if (state.firstTimeUserMode) ...[
-              const SizedBox(height: 18),
-              _WelcomeBannerCard(
-                onDismiss: () => state.setFirstTimeUserMode(false),
-              ),
-            ],
-            const SizedBox(height: 24),
-            _SectionHeader(
-              title: 'Shop by category',
-              actionLabel: 'View all',
-              onAction: () => SastaNav.openCategories(context),
             ),
             const SizedBox(height: 12),
-            SizedBox(
-              height: 98 +
-                  26 *
-                      MediaQuery.textScalerOf(context)
-                          .scale(1.0)
-                          .clamp(1.0, 1.8),
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                physics: const BouncingScrollPhysics(),
-                clipBehavior: Clip.none,
-                itemCount: 6,
-                separatorBuilder: (_, _) => const SizedBox(width: 10),
-                itemBuilder: (context, index) {
-                  final cat = MockCatalog.categories[index];
-                  return _CategoryRailCard(
-                    category: cat,
-                    onTap: () => SastaNav.openSearchResults(
-                      context,
-                      categoryId: cat.id,
-                      titleOverride: cat.name,
-                    ),
-                  );
-                },
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(
+                SastaSpace.page,
+                2,
+                SastaSpace.page,
+                6,
+              ),
+              child: IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (var index = 0; index < 6; index++) ...[
+                      if (index > 0) const SizedBox(width: 10),
+                      _CategoryRailCard(
+                        category: MockCatalog.categories[index],
+                        onTap: () => SastaNav.openSearchResults(
+                          context,
+                          categoryId: MockCatalog.categories[index].id,
+                          titleOverride: MockCatalog.categories[index].name,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 22),
-            _SectionHeader(
-              title: 'Popular searches',
-              actionLabel: 'More',
-              onAction: () => SastaNav.openHomeSearch(context),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: SastaSpace.page),
+              child: _SectionHeader(
+                title: 'Popular searches',
+                actionLabel: 'More',
+                onAction: () => SastaNav.openHomeSearch(context),
+              ),
             ),
             const SizedBox(height: 10),
-            SizedBox(
-              height: 44,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                physics: const BouncingScrollPhysics(),
-                clipBehavior: Clip.none,
-                itemCount: MockCatalog.popularSearches.length,
-                separatorBuilder: (_, _) => const SizedBox(width: 8),
-                itemBuilder: (context, index) {
-                  final term = MockCatalog.popularSearches[index];
-                  return SastaChip(
-                    label: term,
-                    onTap: () {
-                      state.addSearchQuery(term);
-                      SastaNav.openSearchResults(context, query: term);
-                    },
-                  );
-                },
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(
+                SastaSpace.page,
+                2,
+                SastaSpace.page,
+                6,
+              ),
+              child: Row(
+                children: [
+                  for (var index = 0;
+                      index < MockCatalog.popularSearches.length;
+                      index++) ...[
+                    if (index > 0) const SizedBox(width: 8),
+                    SastaChip(
+                      label: MockCatalog.popularSearches[index],
+                      onTap: () {
+                        final term = MockCatalog.popularSearches[index];
+                        state.addSearchQuery(term);
+                        SastaNav.openSearchResults(context, query: term);
+                      },
+                    ),
+                  ],
+                ],
               ),
             ),
             if (!state.firstTimeUserMode) ...[
@@ -257,34 +275,68 @@ class HomeScreen extends StatelessWidget {
               const SizedBox(height: 24),
               _PricesDroppedSection(state: state),
               const SizedBox(height: 22),
-              _HomeSmartBasketCard(state: state),
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: SastaSpace.page),
+                child: _HomeSmartBasketCard(state: state),
+              ),
               const SizedBox(height: 22),
               _SmartPicksSection(state: state),
               const SizedBox(height: 22),
               _ExploreBrandsSection(state: state),
               const SizedBox(height: 22),
-              const _HomeSavingsCard(),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: SastaSpace.page),
+                child: _HomeSavingsCard(),
+              ),
               const SizedBox(height: 22),
-              _HomePriceAlertsCard(state: state),
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: SastaSpace.page),
+                child: _HomePriceAlertsCard(state: state),
+              ),
               const SizedBox(height: 22),
-              const _MonthlySavingsCard(),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: SastaSpace.page),
+                child: _MonthlySavingsCard(),
+              ),
               const SizedBox(height: 22),
-              _SastaPlusPromoCard(state: state),
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: SastaSpace.page),
+                child: _SastaPlusPromoCard(state: state),
+              ),
               const SizedBox(height: 22),
-              _RecentlyComparedSection(state: state),
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: SastaSpace.page),
+                child: _RecentlyComparedSection(state: state),
+              ),
               const SizedBox(height: 22),
               _RecentlyViewedSection(state: state),
             ] else ...[
               const SizedBox(height: 22),
-              _FirstTimeBasketEmptyCard(
-                onStart: () => state.setActiveTab(1),
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: SastaSpace.page),
+                child: _FirstTimeBasketEmptyCard(
+                  onStart: () => state.setActiveTab(1),
+                ),
               ),
               const SizedBox(height: 18),
-              _FirstTimeAlertsEmptyCard(
-                onCreateAlert: () => showCreatePriceAlertSheet(context),
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: SastaSpace.page),
+                child: _FirstTimeAlertsEmptyCard(
+                  onCreateAlert: () => showCreatePriceAlertSheet(context),
+                ),
               ),
               const SizedBox(height: 20),
-              _SastaPlusPromoCard(state: state),
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: SastaSpace.page),
+                child: _SastaPlusPromoCard(state: state),
+              ),
             ],
           ],
         ],
@@ -522,41 +574,54 @@ class _BestDealsSection extends StatelessWidget {
     final deals = state.products.where((p) => p.isDeal).toList();
     return Column(
       children: [
-        _SectionHeader(
-          title: 'Best deals for you',
-          actionLabel: 'View all deals',
-          onAction: () => SastaNav.openSearchResults(
-            context,
-            titleOverride: 'Best deals',
-            dealsOnly: true,
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: SastaSpace.page),
+          child: _SectionHeader(
+            title: 'Best deals for you',
+            actionLabel: 'View all deals',
+            onAction: () => SastaNav.openSearchResults(
+              context,
+              titleOverride: 'Best deals',
+              dealsOnly: true,
+            ),
           ),
         ),
         const SizedBox(height: 12),
-        SizedBox(
-          height: 198 +
-              30 *
-                  MediaQuery.textScalerOf(context).scale(1.0).clamp(1.0, 1.8),
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            clipBehavior: Clip.none,
-            itemCount: deals.length,
-            separatorBuilder: (_, _) => const SizedBox(width: 12),
-            itemBuilder: (context, i) {
-              final p = deals[i];
-              final cheapest = p.cheapestQuote(
-                p.defaultVariantIndex,
-                enabledRetailers: state.enabledRetailers,
-              );
-              final pct = cheapest?.discountPercent;
-              return ProductGridCard(
-                width: 196,
-                product: p,
-                enabledRetailers: state.enabledRetailers,
-                badgeText: pct != null ? '-$pct%' : null,
-                onTap: () => SastaNav.openProductDetails(context, p.id),
-              );
-            },
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(
+            SastaSpace.page,
+            2,
+            SastaSpace.page,
+            6,
+          ),
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (var i = 0; i < deals.length; i++) ...[
+                  if (i > 0) const SizedBox(width: 12),
+                  Builder(
+                    builder: (context) {
+                      final p = deals[i];
+                      final cheapest = p.cheapestQuote(
+                        p.defaultVariantIndex,
+                        enabledRetailers: state.enabledRetailers,
+                      );
+                      final pct = cheapest?.discountPercent;
+                      return ProductGridCard(
+                        width: 196,
+                        product: p,
+                        enabledRetailers: state.enabledRetailers,
+                        badgeText: pct != null ? '-$pct%' : null,
+                        onTap: () => SastaNav.openProductDetails(context, p.id),
+                      );
+                    },
+                  ),
+                ],
+              ],
+            ),
           ),
         ),
       ],
@@ -573,34 +638,43 @@ class _TrendingSection extends StatelessWidget {
     final items = state.products.where((p) => p.isTrending).toList();
     return Column(
       children: [
-        _SectionHeader(
-          title: 'Trending now',
-          actionLabel: 'See all',
-          onAction: () => SastaNav.openSearchResults(
-            context,
-            titleOverride: 'Trending now',
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: SastaSpace.page),
+          child: _SectionHeader(
+            title: 'Trending now',
+            actionLabel: 'See all',
+            onAction: () => SastaNav.openSearchResults(
+              context,
+              titleOverride: 'Trending now',
+            ),
           ),
         ),
         const SizedBox(height: 12),
-        SizedBox(
-          height: 196 +
-              30 *
-                  MediaQuery.textScalerOf(context).scale(1.0).clamp(1.0, 1.8),
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            clipBehavior: Clip.none,
-            itemCount: items.length,
-            separatorBuilder: (_, _) => const SizedBox(width: 10),
-            itemBuilder: (context, i) {
-              final p = items[i];
-              return ProductGridCard(
-                width: 162,
-                product: p,
-                enabledRetailers: state.enabledRetailers,
-                onTap: () => SastaNav.openProductDetails(context, p.id),
-              );
-            },
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(
+            SastaSpace.page,
+            2,
+            SastaSpace.page,
+            6,
+          ),
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (var i = 0; i < items.length; i++) ...[
+                  if (i > 0) const SizedBox(width: 10),
+                  ProductGridCard(
+                    width: 162,
+                    product: items[i],
+                    enabledRetailers: state.enabledRetailers,
+                    onTap: () =>
+                        SastaNav.openProductDetails(context, items[i].id),
+                  ),
+                ],
+              ],
+            ),
           ),
         ),
       ],
@@ -618,134 +692,162 @@ class _PricesDroppedSection extends StatelessWidget {
     final drops = state.products.where((p) => p.isPriceDrop).toList();
     return Column(
       children: [
-        _SectionHeader(
-          title: 'Prices dropped',
-          actionLabel: 'View all',
-          onAction: () => SastaNav.push(context, SastaRouteNames.notifications),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: SastaSpace.page),
+          child: _SectionHeader(
+            title: 'Prices dropped',
+            actionLabel: 'View all',
+            onAction: () => SastaNav.push(context, SastaRouteNames.notifications),
+          ),
         ),
         const SizedBox(height: 12),
-        SizedBox(
-          height: 170 +
-              26 *
-                  MediaQuery.textScalerOf(context).scale(1.0).clamp(1.0, 1.8),
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            clipBehavior: Clip.none,
-            itemCount: drops.length,
-            separatorBuilder: (_, _) => const SizedBox(width: 12),
-            itemBuilder: (context, i) {
-              final p = drops[i];
-              final cheapest = p.cheapestQuote(p.defaultVariantIndex);
-              return SastaCard(
-                color: palette.surface,
-                onTap: () => SastaNav.openPriceHistory(context, p.id),
-                child: SizedBox(
-                  width: 236,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          ProductArtTile(
-                            kind: p.artKind,
-                            pastel: p.pastel,
-                            size: 52,
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  p.name,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: SastaText.body(
-                                    context,
-                                    size: 14,
-                                    weight: FontWeight.w700,
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(
+            SastaSpace.page,
+            2,
+            SastaSpace.page,
+            6,
+          ),
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (var i = 0; i < drops.length; i++) ...[
+                  if (i > 0) const SizedBox(width: 12),
+                  Builder(
+                    builder: (context) {
+                      final p = drops[i];
+                      final cheapest = p.cheapestQuote(p.defaultVariantIndex);
+                      return SastaCard(
+                        color: palette.surface,
+                        onTap: () => SastaNav.openPriceHistory(context, p.id),
+                        child: SizedBox(
+                          width: 236,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      ProductArtTile(
+                                        kind: p.artKind,
+                                        pastel: p.pastel,
+                                        size: 52,
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              p.name,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: SastaText.body(
+                                                context,
+                                                size: 14,
+                                                weight: FontWeight.w700,
+                                              ),
+                                            ),
+                                            Text(
+                                              '${p.variantAt(p.defaultVariantIndex).label} · ${cheapest?.retailer.shortName ?? ''}',
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: SastaText.muted(
+                                                context,
+                                                size: 12,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                ),
-                                Text(
-                                  '${p.variantAt(p.defaultVariantIndex).label} · ${cheapest?.retailer.shortName ?? ''}',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: SastaText.muted(context, size: 12),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Text(
-                            cheapest != null ? '₹${cheapest.price}' : '—',
-                            style: SastaText.display(context, size: 22),
-                          ),
-                          const SizedBox(width: 8),
-                          if (p.isLowestIn30Days)
-                            Flexible(
-                              child: FittedBox(
-                                fit: BoxFit.scaleDown,
-                                alignment: Alignment.centerLeft,
-                                child: SastaTag(
-                                  label: 'Lowest in 30 days',
-                                  backgroundColor: palette.mint,
-                                  textColor: palette.successText,
-                                ),
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    children: [
+                                      Text(
+                                        cheapest != null
+                                            ? '₹${cheapest.price}'
+                                            : '—',
+                                        style:
+                                            SastaText.display(context, size: 22),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      if (p.isLowestIn30Days)
+                                        Flexible(
+                                          child: FittedBox(
+                                            fit: BoxFit.scaleDown,
+                                            alignment: Alignment.centerLeft,
+                                            child: SastaTag(
+                                              label: 'Lowest in 30 days',
+                                              backgroundColor: palette.mint,
+                                              textColor: palette.successText,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ],
                               ),
-                            ),
-                        ],
-                      ),
-                      const Spacer(),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: GestureDetector(
-                              onTap: () =>
-                                  SastaNav.openPriceHistory(context, p.id),
-                              child: Text(
-                                'Price history →',
-                                style: SastaText.body(
-                                  context,
-                                  size: 13,
-                                  weight: FontWeight.w700,
-                                  color: palette.linkText,
-                                ),
+                              const SizedBox(height: 10),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: GestureDetector(
+                                      onTap: () => SastaNav.openPriceHistory(
+                                        context,
+                                        p.id,
+                                      ),
+                                      child: Text(
+                                        'Price history →',
+                                        style: SastaText.body(
+                                          context,
+                                          size: 13,
+                                          weight: FontWeight.w700,
+                                          color: palette.linkText,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  InkWell(
+                                    onTap: () => showCreatePriceAlertSheet(
+                                      context,
+                                      initialProduct: p,
+                                    ),
+                                    borderRadius: BorderRadius.circular(18),
+                                    child: Container(
+                                      width: 36,
+                                      height: 36,
+                                      decoration: BoxDecoration(
+                                        color: palette.field,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      alignment: Alignment.center,
+                                      child: Icon(
+                                        Icons.notifications_active_outlined,
+                                        size: 18,
+                                        color: palette.ink,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ),
+                            ],
                           ),
-                          InkWell(
-                            onTap: () => showCreatePriceAlertSheet(
-                              context,
-                              initialProduct: p,
-                            ),
-                            borderRadius: BorderRadius.circular(18),
-                            child: Container(
-                              width: 36,
-                              height: 36,
-                              decoration: BoxDecoration(
-                                color: palette.field,
-                                shape: BoxShape.circle,
-                              ),
-                              alignment: Alignment.center,
-                              child: Icon(
-                                Icons.notifications_active_outlined,
-                                size: 18,
-                                color: palette.ink,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                        ),
+                      );
+                    },
                   ),
-                ),
-              );
-            },
+                ],
+              ],
+            ),
           ),
         ),
       ],
@@ -867,94 +969,112 @@ class _SmartPicksSection extends StatelessWidget {
 
     return Column(
       children: [
-        _SectionHeader(
-          title: 'Smart picks for you',
-          actionLabel: 'View all',
-          onAction: () => SastaNav.openSearchResults(
-            context,
-            titleOverride: 'Smart picks',
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: SastaSpace.page),
+          child: _SectionHeader(
+            title: 'Smart picks for you',
+            actionLabel: 'View all',
+            onAction: () => SastaNav.openSearchResults(
+              context,
+              titleOverride: 'Smart picks',
+            ),
           ),
         ),
         const SizedBox(height: 12),
-        SizedBox(
-          height: 162,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            clipBehavior: Clip.none,
-            itemCount: picks.length,
-            separatorBuilder: (_, _) => const SizedBox(width: 12),
-            itemBuilder: (context, i) {
-              final pick = picks[i];
-              return SastaCard(
-                color: palette.pastel(pick.pastel),
-                shadow: false,
-                onTap: () => SastaNav.openProductDetails(
-                  context,
-                  pick.productId,
-                  variantIndex: pick.variantIdx,
-                ),
-                child: SizedBox(
-                  width: 244,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Align(
-                              alignment: Alignment.centerLeft,
-                              child: FittedBox(
-                                fit: BoxFit.scaleDown,
-                                alignment: Alignment.centerLeft,
-                                child: SastaTag(
-                                  label: pick.tag,
-                                  backgroundColor: palette.isDark
-                                      ? palette.surface
-                                      : Colors.white,
-                                  textColor: palette.pastelAccent(pick.pastel),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(
+            SastaSpace.page,
+            2,
+            SastaSpace.page,
+            6,
+          ),
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (var i = 0; i < picks.length; i++) ...[
+                  if (i > 0) const SizedBox(width: 12),
+                  Builder(
+                    builder: (context) {
+                      final pick = picks[i];
+                      return SastaCard(
+                        color: palette.pastel(pick.pastel),
+                        shadow: false,
+                        onTap: () => SastaNav.openProductDetails(
+                          context,
+                          pick.productId,
+                          variantIndex: pick.variantIdx,
+                        ),
+                        child: SizedBox(
+                          width: 244,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        alignment: Alignment.centerLeft,
+                                        child: SastaTag(
+                                          label: pick.tag,
+                                          backgroundColor: palette.isDark
+                                              ? palette.surface
+                                              : Colors.white,
+                                          textColor: palette.pastelAccent(
+                                            pick.pastel,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  InkWell(
+                                    onTap: () =>
+                                        state.dismissSmartPick(pick.id),
+                                    borderRadius: BorderRadius.circular(14),
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(4),
+                                      child: Icon(
+                                        Icons.close_rounded,
+                                        size: 18,
+                                        color: palette.muted,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                pick.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: SastaText.body(
+                                  context,
+                                  size: 15,
+                                  weight: FontWeight.w700,
                                 ),
                               ),
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          InkWell(
-                            onTap: () => state.dismissSmartPick(pick.id),
-                            borderRadius: BorderRadius.circular(14),
-                            child: Padding(
-                              padding: const EdgeInsets.all(4),
-                              child: Icon(
-                                Icons.close_rounded,
-                                size: 18,
-                                color: palette.muted,
+                              const SizedBox(height: 4),
+                              Text(
+                                pick.subtitle,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: SastaText.muted(context, size: 12),
                               ),
-                            ),
+                            ],
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        pick.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: SastaText.body(
-                          context,
-                          size: 15,
-                          weight: FontWeight.w700,
                         ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        pick.subtitle,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: SastaText.muted(context, size: 12),
-                      ),
-                    ],
+                      );
+                    },
                   ),
-                ),
-              );
-            },
+                ],
+              ],
+            ),
           ),
         ),
       ],
@@ -972,27 +1092,36 @@ class _ExploreBrandsSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _SectionHeader(title: 'Explore more brands'),
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: SastaSpace.page),
+          child: _SectionHeader(title: 'Explore more brands'),
+        ),
         const SizedBox(height: 10),
-        SizedBox(
-          height: 44,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            clipBehavior: Clip.none,
-            itemCount: MockCatalog.popularBrands.length,
-            separatorBuilder: (_, _) => const SizedBox(width: 8),
-            itemBuilder: (context, i) {
-              final b = MockCatalog.popularBrands[i];
-              return SastaChip(
-                label: b.name,
-                backgroundColor: palette.pastel(b.pastel),
-                onTap: () {
-                  state.addSearchQuery(b.name);
-                  SastaNav.openSearchResults(context, query: b.name);
-                },
-              );
-            },
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(
+            SastaSpace.page,
+            2,
+            SastaSpace.page,
+            6,
+          ),
+          child: Row(
+            children: [
+              for (var i = 0; i < MockCatalog.popularBrands.length; i++) ...[
+                if (i > 0) const SizedBox(width: 8),
+                SastaChip(
+                  label: MockCatalog.popularBrands[i].name,
+                  backgroundColor:
+                      palette.pastel(MockCatalog.popularBrands[i].pastel),
+                  onTap: () {
+                    final name = MockCatalog.popularBrands[i].name;
+                    state.addSearchQuery(name);
+                    SastaNav.openSearchResults(context, query: name);
+                  },
+                ),
+              ],
+            ],
           ),
         ),
       ],
@@ -1438,32 +1567,40 @@ class _RecentlyViewedSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _SectionHeader(
-          title: 'Recently viewed',
-          actionLabel: 'View all',
-          onAction: () => SastaNav.openSearchResults(context),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: SastaSpace.page),
+          child: _SectionHeader(
+            title: 'Recently viewed',
+            actionLabel: 'View all',
+            onAction: () => SastaNav.openSearchResults(context),
+          ),
         ),
         const SizedBox(height: 10),
-        SizedBox(
-          height: 104,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            clipBehavior: Clip.none,
-            itemCount: items.length,
-            separatorBuilder: (_, _) => const SizedBox(width: 10),
-            itemBuilder: (context, i) {
-              final p = items[i];
-              return GestureDetector(
-                onTap: () => SastaNav.openProductDetails(context, p.id),
-                child: ProductArtTile(
-                  kind: p.artKind,
-                  pastel: p.pastel,
-                  size: 96,
-                  borderRadius: 28,
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(
+            SastaSpace.page,
+            2,
+            SastaSpace.page,
+            6,
+          ),
+          child: Row(
+            children: [
+              for (var i = 0; i < items.length; i++) ...[
+                if (i > 0) const SizedBox(width: 10),
+                GestureDetector(
+                  onTap: () =>
+                      SastaNav.openProductDetails(context, items[i].id),
+                  child: ProductArtTile(
+                    kind: items[i].artKind,
+                    pastel: items[i].pastel,
+                    size: 96,
+                    borderRadius: 28,
+                  ),
                 ),
-              );
-            },
+              ],
+            ],
           ),
         ),
       ],

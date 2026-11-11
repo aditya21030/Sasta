@@ -923,15 +923,30 @@ class RetailerAvatar extends StatelessWidget {
       decoration: BoxDecoration(
         color: retailer.color,
         shape: BoxShape.circle,
-        border: showBorder
-            ? Border.all(color: palette.surface, width: 2)
-            : null,
+        border: Border.all(
+          color: showBorder
+              ? palette.surface
+              : palette.divider.withValues(alpha: 0.45),
+          width: showBorder ? 2 : 0.75,
+        ),
       ),
-      alignment: Alignment.center,
-      child: SastaMascot(
-        size: size * 0.88,
-        color: retailer.color,
-        expression: expression,
+      child: ClipOval(
+        child: Image.asset(
+          retailer.assetPath,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          filterQuality: FilterQuality.medium,
+          errorBuilder: (context, error, stackTrace) {
+            return Center(
+              child: SastaMascot(
+                size: size * 0.88,
+                color: retailer.color,
+                expression: expression,
+              ),
+            );
+          },
+        ),
       ),
     );
   }

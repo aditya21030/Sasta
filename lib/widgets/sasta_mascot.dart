@@ -56,14 +56,16 @@ class _SastaMascotState extends State<SastaMascot>
     final totalHeight = widget.hasCrown ? widget.size * 1.18 : widget.size;
 
     Widget paintMascot(double eyeScaleY) {
-      return CustomPaint(
-        size: Size(widget.size, totalHeight),
-        painter: _MascotPainter(
-          color: widget.color,
-          expression: widget.expression,
-          hasCrown: widget.hasCrown,
-          haloColor: widget.haloColor,
-          eyeScaleY: disableAnimations ? 1.0 : eyeScaleY,
+      return ClipRect(
+        child: CustomPaint(
+          size: Size(widget.size, totalHeight),
+          painter: _MascotPainter(
+            color: widget.color,
+            expression: widget.expression,
+            hasCrown: widget.hasCrown,
+            haloColor: widget.haloColor,
+            eyeScaleY: disableAnimations ? 1.0 : eyeScaleY,
+          ),
         ),
       );
     }
@@ -237,9 +239,10 @@ class _MascotPainter extends CustomPainter {
 
     // Optional Crown for Sasta+
     if (hasCrown) {
-      final crownW = coreR * 0.96;
-      final crownH = coreR * 0.56;
-      final crownTop = cy - coreR - lobeR * 0.65 - crownH * 0.4;
+      final crownW = coreR * 0.94;
+      final crownH = coreR * 0.52;
+      final crownTop =
+          math.max(2.0, cy - coreR - lobeR * 0.52 - crownH * 0.35);
       final path = Path()
         ..moveTo(cx - crownW * 0.46, crownTop + crownH)
         ..lineTo(cx - crownW * 0.54, crownTop + crownH * 0.22)
@@ -323,8 +326,8 @@ class _SastaSparkleState extends State<SastaSparkle>
       builder: (context, child) {
         final v = Curves.easeInOut.transform(_controller!.value);
         return Opacity(
-          opacity: 0.35 + v * 0.65,
-          child: Transform.scale(scale: 0.85 + v * 0.25, child: child),
+          opacity: 0.38 + v * 0.62,
+          child: Transform.scale(scale: 0.78 + v * 0.22, child: child),
         );
       },
       child: star,

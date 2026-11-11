@@ -28,14 +28,17 @@ class ProductArtTile extends StatelessWidget {
     return Container(
       width: size,
       height: size,
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(radius),
       ),
       alignment: Alignment.center,
-      child: CustomPaint(
-        size: Size.square(size * 0.68),
-        painter: ProductArtPainter(kind: kind),
+      child: ClipRect(
+        child: CustomPaint(
+          size: Size.square(size * 0.68),
+          painter: ProductArtPainter(kind: kind),
+        ),
       ),
     );
   }
@@ -461,12 +464,15 @@ class _PincodePinIllustrationState extends State<PincodePinIllustration>
   Widget build(BuildContext context) {
     final disabled = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     final palette = context.sasta;
-    return SizedBox(
-      width: widget.size,
-      height: widget.size,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      child: SizedBox(
+        width: widget.size,
+        height: widget.size,
+        child: Stack(
+          alignment: Alignment.center,
+          clipBehavior: Clip.hardEdge,
+          children: [
           Container(
             width: widget.size * 0.88,
             height: widget.size * 0.88,
@@ -524,6 +530,7 @@ class _PincodePinIllustrationState extends State<PincodePinIllustration>
           ),
         ],
       ),
+      ),
     );
   }
 }
@@ -566,12 +573,15 @@ class BasketHeroIllustration extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.sasta;
-    return SizedBox(
-      width: size,
-      height: size,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: Stack(
+          alignment: Alignment.center,
+          clipBehavior: Clip.hardEdge,
+          children: [
           Container(
             width: size * 0.86,
             height: size * 0.86,
@@ -606,6 +616,7 @@ class BasketHeroIllustration extends StatelessWidget {
             child: const SastaSparkle(size: 14, color: SastaColors.sparkleOrange),
           ),
         ],
+      ),
       ),
     );
   }
@@ -655,12 +666,15 @@ class SplashHeroArtwork extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 240,
-      height: 220,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      child: SizedBox(
+        width: 240,
+        height: 220,
+        child: Stack(
+          alignment: Alignment.center,
+          clipBehavior: Clip.hardEdge,
+          children: [
           const SastaMascot(
             size: 132,
             color: SastaColors.gold,
@@ -742,6 +756,7 @@ class SplashHeroArtwork extends StatelessWidget {
             child: SastaSparkle(size: 14, color: Colors.white),
           ),
         ],
+      ),
       ),
     );
   }

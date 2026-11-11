@@ -49,6 +49,7 @@ class ProductGridCard extends StatelessWidget {
     final cardContent = Container(
       width: width,
       padding: const EdgeInsets.all(13),
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: palette.pastel(product.pastel),
         borderRadius: BorderRadius.circular(SastaRadius.card),
@@ -57,59 +58,78 @@ class ProductGridCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Center(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 2),
+          if (badgeText != null || showFavouriteButton) ...[
+            SizedBox(
+              height: 32,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  if (badgeText != null)
+                    Expanded(
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: SastaTag(
+                            label: badgeText!,
+                            backgroundColor: badgeIsDark
+                                ? SastaColors.ink
+                                : (palette.isDark
+                                    ? palette.surface
+                                    : Colors.white),
+                            textColor:
+                                badgeIsDark ? Colors.white : palette.successText,
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    const Spacer(),
+                  if (showFavouriteButton)
+                    InkWell(
+                      onTap: onToggleFavourite,
+                      customBorder: const CircleBorder(),
+                      child: Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color:
+                              palette.isDark ? palette.surface : Colors.white,
+                          shape: BoxShape.circle,
+                          boxShadow: SastaShadows.float(context),
+                        ),
+                        alignment: Alignment.center,
+                        child: Icon(
+                          isFavourite
+                              ? Icons.favorite_rounded
+                              : Icons.favorite_border_rounded,
+                          size: 17,
+                          color: isFavourite
+                              ? SastaColors.heartPink
+                              : palette.muted,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 4),
+          ],
+          Center(
+            child: SizedBox(
+              height: 58,
+              width: 58,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: ClipRect(
                   child: CustomPaint(
-                    size: const Size.square(58),
+                    size: const Size.square(56),
                     painter: ProductArtPainter(kind: product.artKind),
                   ),
                 ),
               ),
-              if (badgeText != null)
-                Positioned(
-                  left: 0,
-                  top: 0,
-                  child: SastaTag(
-                    label: badgeText!,
-                    backgroundColor: badgeIsDark
-                        ? SastaColors.ink
-                        : (palette.isDark
-                            ? palette.surface
-                            : Colors.white),
-                    textColor: badgeIsDark ? Colors.white : palette.successText,
-                  ),
-                ),
-              if (showFavouriteButton)
-                Positioned(
-                  right: -4,
-                  top: -4,
-                  child: InkWell(
-                    onTap: onToggleFavourite,
-                    customBorder: const CircleBorder(),
-                    child: Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: palette.isDark ? palette.surface : Colors.white,
-                        shape: BoxShape.circle,
-                        boxShadow: SastaShadows.float(context),
-                      ),
-                      alignment: Alignment.center,
-                      child: Icon(
-                        isFavourite
-                            ? Icons.favorite_rounded
-                            : Icons.favorite_border_rounded,
-                        size: 18,
-                        color: isFavourite ? SastaColors.heartPink : palette.muted,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
+            ),
           ),
           const SizedBox(height: 6),
           Text(
@@ -164,11 +184,13 @@ class ProductGridCard extends StatelessWidget {
                   ),
                 ),
               ),
-              if (availableRetailers.isNotEmpty)
+              if (availableRetailers.isNotEmpty) ...[
+                const SizedBox(width: 4),
                 OverlappingRetailerAvatars(
                   retailers: availableRetailers.take(3).toList(),
-                  avatarSize: 23,
+                  avatarSize: 22,
                 ),
+              ],
             ],
           ),
         ],

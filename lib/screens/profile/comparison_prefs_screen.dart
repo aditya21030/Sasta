@@ -147,38 +147,43 @@ class _ComparisonPrefsScreenState extends State<ComparisonPrefsScreen> {
                 Text('PRICE DISPLAY', style: SastaText.eyebrow(context)),
                 const SizedBox(height: 6),
                 _PrefToggleRow(
-                  title: 'Show unit prices',
-                  subtitle: 'Display ₹ per 100 ml / 100 g where available',
+                  title: 'Show price per 100 g / 100 ml',
+                  subtitle: 'Makes small vs large packs easier to compare',
                   value: state.showUnitPrices,
                   onChanged: (v) =>
                       state.updateComparisonPrefs(showUnitPrices: v),
                 ),
                 _PrefToggleRow(
-                  title: 'Include out-of-stock apps',
-                  subtitle: 'Show unavailable retailers below available quotes',
+                  title: 'Show out-of-stock apps',
+                  subtitle: 'Keep sold-out apps visible at the bottom',
                   value: state.includeUnavailable,
                   onChanged: (v) =>
                       state.updateComparisonPrefs(includeUnavailable: v),
                 ),
                 const SizedBox(height: 16),
-                Text('PRODUCT MATCHING', style: SastaText.eyebrow(context)),
+                Text('PACK MATCHING', style: SastaText.eyebrow(context)),
                 const SizedBox(height: 6),
                 _PrefToggleRow(
                   title: 'Match exact pack sizes',
-                  subtitle: 'Avoid comparing 450 ml packs directly as 500 ml',
+                  subtitle: 'Only compare same sizes (e.g. 500 ml with 500 ml)',
                   value: state.matchPackSizes,
                   onChanged: (v) =>
                       state.updateComparisonPrefs(matchPackSizes: v),
                 ),
                 _PrefToggleRow(
-                  title: 'Suggest cheaper pack alternatives',
-                  subtitle: 'Highlight better value sizes & substitutes',
+                  title: 'Suggest better-value sizes',
+                  subtitle: 'Show when a bigger pack or brand is cheaper',
                   value: state.suggestAlternatives,
                   onChanged: (v) =>
                       state.updateComparisonPrefs(suggestAlternatives: v),
                 ),
                 const SizedBox(height: 16),
                 Text('DEFAULT BASKET MODE', style: SastaText.eyebrow(context)),
+                const SizedBox(height: 4),
+                Text(
+                  'Choose how your grocery basket recommends stores first.',
+                  style: SastaText.muted(context, size: 12),
+                ),
                 const SizedBox(height: 10),
                 Container(
                   height: 46,
@@ -189,33 +194,38 @@ class _ComparisonPrefsScreenState extends State<ComparisonPrefsScreen> {
                   ),
                   child: Row(
                     children: [
-                      for (final mode in [
-                        'Cheapest complete',
-                        'Fewer retailers',
+                      for (final option in const [
+                        (value: 'Cheapest complete', label: 'Lowest total'),
+                        (value: 'Fewer retailers', label: 'Single app'),
                       ])
                         Expanded(
                           child: GestureDetector(
                             onTap: () => state.updateComparisonPrefs(
-                              defaultBasketMode: mode,
+                              defaultBasketMode: option.value,
                             ),
                             child: AnimatedContainer(
                               duration: SastaMotion.fast,
                               alignment: Alignment.center,
+                              padding: const EdgeInsets.symmetric(horizontal: 6),
                               decoration: BoxDecoration(
-                                color: state.defaultBasketMode == mode
+                                color: state.defaultBasketMode == option.value
                                     ? palette.primaryCtaBg
                                     : Colors.transparent,
                                 borderRadius: BorderRadius.circular(20),
                               ),
-                              child: Text(
-                                mode,
-                                style: SastaText.body(
-                                  context,
-                                  size: 13,
-                                  weight: FontWeight.w700,
-                                  color: state.defaultBasketMode == mode
-                                      ? palette.primaryCtaFg
-                                      : palette.muted,
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  option.label,
+                                  style: SastaText.body(
+                                    context,
+                                    size: 13,
+                                    weight: FontWeight.w700,
+                                    color:
+                                        state.defaultBasketMode == option.value
+                                            ? palette.primaryCtaFg
+                                            : palette.muted,
+                                  ),
                                 ),
                               ),
                             ),
@@ -225,78 +235,79 @@ class _ComparisonPrefsScreenState extends State<ComparisonPrefsScreen> {
                   ),
                 ),
                 const SizedBox(height: 22),
-                Text('QUICK-COMMERCE API', style: SastaText.eyebrow(context)),
-                const SizedBox(height: 8),
                 SastaCard(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(
-                            state.isLiveCatalogActive
-                                ? Icons.cloud_done_rounded
-                                : Icons.cloud_queue_rounded,
-                            size: 18,
-                            color: state.isLiveCatalogActive
-                                ? palette.successText
-                                : palette.muted,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 6,
+                  ),
+                  child: Theme(
+                    data: Theme.of(context).copyWith(
+                      dividerColor: Colors.transparent,
+                    ),
+                    child: ExpansionTile(
+                      tilePadding: EdgeInsets.zero,
+                      childrenPadding: const EdgeInsets.only(bottom: 10),
+                      leading: Icon(
+                        state.isLiveCatalogActive
+                            ? Icons.cloud_done_rounded
+                            : Icons.tune_rounded,
+                        color: state.isLiveCatalogActive
+                            ? palette.successText
+                            : palette.muted,
+                      ),
+                      title: Text(
+                        'Live price server (Optional)',
+                        style: SastaText.body(
+                          context,
+                          size: 14,
+                          weight: FontWeight.w700,
+                        ),
+                      ),
+                      subtitle: Text(
+                        state.isLiveCatalogActive
+                            ? 'Connected · custom price feed active'
+                            : 'Built-in price catalog active · tap to link API',
+                        style: SastaText.muted(context, size: 12),
+                      ),
+                      children: [
+                        if (state.lastSyncError != null) ...[
+                          const SizedBox(height: 6),
+                          Align(
+                            alignment: Alignment.centerLeft,
                             child: Text(
-                              state.isLiveCatalogActive
-                                  ? 'Live catalog active'
-                                  : (state.isApiConfigured
-                                      ? 'API configured · ready to sync'
-                                      : 'Using cached local catalog'),
+                              state.lastSyncError!,
                               style: SastaText.body(
                                 context,
-                                size: 13,
-                                weight: FontWeight.w700,
-                                color: state.isLiveCatalogActive
-                                    ? palette.successText
-                                    : palette.ink,
+                                size: 12,
+                                color: palette.dangerText,
                               ),
                             ),
                           ),
                         ],
-                      ),
-                      if (state.lastSyncError != null) ...[
-                        const SizedBox(height: 6),
-                        Text(
-                          state.lastSyncError!,
-                          style: SastaText.body(
-                            context,
-                            size: 12,
-                            color: palette.dangerText,
-                          ),
+                        const SizedBox(height: 8),
+                        _ApiTextField(
+                          controller: _baseUrlCtrl,
+                          hint: 'https://api.yourdomain.com',
+                          label: 'Server URL',
+                        ),
+                        const SizedBox(height: 10),
+                        _ApiTextField(
+                          controller: _apiKeyCtrl,
+                          hint: 'Optional access key',
+                          label: 'Access Key',
+                        ),
+                        const SizedBox(height: 12),
+                        SastaOutlineButton(
+                          label: (_savingApi || state.isCatalogSyncing)
+                              ? 'Syncing live prices…'
+                              : 'Save & sync live prices',
+                          height: 44,
+                          onPressed: (_savingApi || state.isCatalogSyncing)
+                              ? null
+                              : _saveAndSyncApi,
                         ),
                       ],
-                      const SizedBox(height: 12),
-                      _ApiTextField(
-                        controller: _baseUrlCtrl,
-                        hint: 'https://api.yourdomain.com',
-                        label: 'API Base URL',
-                      ),
-                      const SizedBox(height: 10),
-                      _ApiTextField(
-                        controller: _apiKeyCtrl,
-                        hint: 'Optional Bearer / X-API-Key',
-                        label: 'API Key',
-                      ),
-                      const SizedBox(height: 12),
-                      SastaOutlineButton(
-                        label: (_savingApi || state.isCatalogSyncing)
-                            ? 'Syncing live prices…'
-                            : 'Save & sync live prices',
-                        height: 44,
-                        onPressed: (_savingApi || state.isCatalogSyncing)
-                            ? null
-                            : _saveAndSyncApi,
-                      ),
-                    ],
+                    ),
                   ),
                 ),
                 const SizedBox(height: 24),

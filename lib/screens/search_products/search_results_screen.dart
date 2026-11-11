@@ -210,12 +210,11 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                       ],
                     ),
                     const SizedBox(height: 14),
-                    SizedBox(
-                      height: 44,
-                      child: ListView(
-                        scrollDirection: Axis.horizontal,
-                        physics: const BouncingScrollPhysics(),
-                        clipBehavior: Clip.none,
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      physics: const BouncingScrollPhysics(),
+                      padding: const EdgeInsets.symmetric(vertical: 2),
+                      child: Row(
                         children: [
                           SastaChip(
                             label: _retailerFilter?.shortName ?? 'All apps',

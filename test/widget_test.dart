@@ -175,11 +175,11 @@ void main() {
       await pumpRoute(tester, 550);
 
       expect(find.byType(BasketCompareScreen), findsOneWidget);
-      expect(find.text('Single store'), findsOneWidget);
-      expect(find.text('Split basket'), findsOneWidget);
+      expect(find.text('1 Store'), findsOneWidget);
+      expect(find.text('Mix Stores'), findsOneWidget);
       expect(find.text('₹266'), findsWidgets);
 
-      await tester.tap(find.text('Split basket'));
+      await tester.tap(find.text('Mix Stores'));
       await tester.pump(const Duration(milliseconds: 350));
       expect(find.text('₹264'), findsWidgets);
 
@@ -335,10 +335,10 @@ void main() {
       await tester.pump(const Duration(milliseconds: 250));
       expect(state.activeBasket.totalItems, initialItems);
 
-      // Compare basket -> Split basket & Savings on 360x640
+      // Compare basket -> Mix Stores & Savings on 360x640
       await tester.tap(find.text('Compare basket'));
       await pumpRoute(tester, 550);
-      await tester.tap(find.text('Split basket'));
+      await tester.tap(find.text('Mix Stores'));
       await tester.pump(const Duration(milliseconds: 300));
       await tester.tap(find.text('Savings'));
       await tester.pump(const Duration(milliseconds: 300));
@@ -679,7 +679,16 @@ void main() {
       await pumpRoute(tester, 550);
 
       expect(find.byType(ComparisonPrefsScreen), findsOneWidget);
-      expect(find.text('QUICK-COMMERCE API'), findsOneWidget);
+      await scrollSafeIntoView(
+        tester,
+        find.text('Live price server (Optional)'),
+        scrollableIn(ComparisonPrefsScreen),
+        delta: 220,
+      );
+      expect(find.text('Live price server (Optional)'), findsOneWidget);
+      await tester.tap(find.text('Live price server (Optional)'));
+      await pumpRoute(tester, 350);
+      expect(find.text('Server URL'), findsOneWidget);
       expect(find.text('Save & sync live prices'), findsOneWidget);
     },
   );

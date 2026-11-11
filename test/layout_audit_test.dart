@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import 'package:sasta/data/mock_catalog.dart';
 import 'package:sasta/data/sasta_app_state.dart';
+import 'package:sasta/widgets/product_art.dart';
+import 'package:sasta/widgets/product_grid_card.dart';
 import 'package:sasta/models/models.dart';
 import 'package:sasta/screens/basket/basket_screen.dart';
 import 'package:sasta/screens/basket/basket_select_screen.dart';
@@ -318,4 +322,134 @@ void main() {
 
     expect(failures, isEmpty, reason: failures.join('\n'));
   });
+
+  testWidgets(
+    'Real retailer icons resolve, ProductGridCard children stay bounded & non-overlapping, and Onboarding/Compare tabs fit 320x568',
+    (WidgetTester tester) async {
+      TestWidgetsFlutterBinding.ensureInitialized();
+
+      // 1. Every official retailer PNG asset must exist in bundle and start with PNG signature.
+      for (final retailer in RetailerId.values) {
+        final data = await rootBundle.load(retailer.assetPath);
+        final bytes = data.buffer.asUint8List();
+        expect(bytes.length, greaterThan(1000), reason: retailer.assetPath);
+        expect(bytes.sublist(0, 4), [0x89, 0x50, 0x4E, 0x47]);
+      }
+
+      // 2. ProductGridCard at tight 320px 2-column width (~133px): badge, heart, and art stay inside bounds & never overlap.
+      await tester.binding.setSurfaceSize(const Size(320, 568));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      final sampleProduct = MockCatalog.products.first;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildSastaTheme(Brightness.light),
+          home: Scaffold(
+            body: Center(
+              child: SizedBox(
+                width: 133,
+                child: ProductGridCard(
+                  product: sampleProduct,
+                  badgeText: '-40%',
+                  showFavouriteButton: true,
+                  onToggleFavourite: () {},
+                  onTap: () {},
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 100));
+
+      final cardRect = tester.getRect(find.byType(ProductGridCard));
+      final badgeRect = tester.getRect(find.text('-40%'));
+      final heartRect =
+          tester.getRect(find.byIcon(Icons.favorite_border_rounded));
+      final artRect = tester.getRect(
+        find.descendant(
+          of: find.byType(ProductGridCard),
+          matching: find.byWidgetPredicate(
+            (w) => w is CustomPaint && w.painter is ProductArtPainter,
+          ),
+        ),
+      );
+
+      expect(cardRect.left <= badgeRect.left, isTrue);
+      expect(cardRect.top <= badgeRect.top, isTrue);
+      expect(cardRect.right >= heartRect.right, isTrue);
+      expect(cardRect.top <= heartRect.top, isTrue);
+      expect(badgeRect.overlaps(heartRect), isFalse);
+      expect(badgeRect.overlaps(artRect), isFalse);
+      expect(heartRect.overlaps(artRect), isFalse);
+
+      // 3. RetailerAvatar widgets render all 4 brands without overflow or error.
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildSastaTheme(Brightness.dark),
+          home: Scaffold(
+            body: Wrap(
+              spacing: 12,
+              children: [
+                for (final r in RetailerId.values)
+                  RetailerAvatar(retailer: r, size: 64, showBorder: true),
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.byType(Image), findsNWidgets(RetailerId.values.length));
+
+      // 4. OnboardingScreen orb stays within 320x568 @1.25x viewport.
+      final state = makeState();
+      addTearDown(state.dispose);
+      final overflowErrors = <String>[];
+      final prev = FlutterError.onError;
+      FlutterError.onError = (d) => overflowErrors.add(d.exceptionAsString());
+      try {
+        await tester.pumpWidget(
+          SastaScope(
+            state: state,
+            child: MaterialApp(
+              theme: buildSastaTheme(Brightness.light),
+              builder: (ctx, c) => MediaQuery(
+                data: MediaQuery.of(ctx).copyWith(
+                  textScaler: const TextScaler.linear(1.25),
+                ),
+                child: c!,
+              ),
+              home: const OnboardingScreen(),
+            ),
+          ),
+        );
+        await tester.pump(const Duration(milliseconds: 350));
+
+        // 5. BasketCompareScreen Mix Stores + Savings tabs at 320x568 @1.25x.
+        await tester.pumpWidget(
+          SastaScope(
+            state: state,
+            child: MaterialApp(
+              theme: buildSastaTheme(Brightness.light),
+              builder: (ctx, c) => MediaQuery(
+                data: MediaQuery.of(ctx).copyWith(
+                  textScaler: const TextScaler.linear(1.25),
+                ),
+                child: c!,
+              ),
+              home: const BasketCompareScreen(),
+            ),
+          ),
+        );
+        await tester.pump(const Duration(milliseconds: 350));
+        await tester.tap(find.text('Mix Stores'));
+        await tester.pump(const Duration(milliseconds: 350));
+        await tester.tap(find.text('Savings'));
+        await tester.pump(const Duration(milliseconds: 350));
+      } finally {
+        FlutterError.onError = prev;
+      }
+      expect(overflowErrors, isEmpty, reason: overflowErrors.join('\n'));
+    },
+  );
 }

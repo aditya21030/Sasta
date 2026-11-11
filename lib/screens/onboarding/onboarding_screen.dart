@@ -25,17 +25,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     (
       title: 'Search once.\nCompare everywhere.',
       subtitle:
-          'Sasta checks Blinkit, Zepto, Swiggy Instamart and Flipkart Minutes for you.',
+          'Check Blinkit, Zepto, Swiggy Instamart and Flipkart Minutes together before you buy.',
     ),
     (
-      title: 'One basket.\nSmartest split.',
+      title: 'One basket.\nSmartest choice.',
       subtitle:
-          'Compare whole baskets at a glance and see when splitting across two apps actually saves.',
+          'See which single app costs least for your whole list, or mix stores when it saves extra.',
     ),
     (
-      title: 'Track drops.\nSave effortlessly.',
+      title: 'Catch price drops.\nSpend less daily.',
       subtitle:
-          'Watch 30-day price trends and set target price alerts for household staples.',
+          'Follow simple 30-day price charts and get notified when everyday essentials drop.',
     ),
   ];
 
@@ -178,12 +178,15 @@ class _OnboardingOrb extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.sasta;
-    return SizedBox(
-      width: 310,
-      height: 300,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      child: SizedBox(
+        width: 310,
+        height: 300,
+        child: Stack(
+          alignment: Alignment.center,
+          clipBehavior: Clip.hardEdge,
+          children: [
           Container(
             width: 280,
             height: 280,
@@ -308,6 +311,7 @@ class _OnboardingOrb extends StatelessWidget {
             ),
           ],
         ],
+      ),
       ),
     );
   }

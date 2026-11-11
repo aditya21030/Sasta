@@ -201,11 +201,10 @@ Future<void> showRetailerHandoffSheet(
             ),
             const SizedBox(height: 18),
             Center(
-              child: SastaMascot(
-                size: 86,
-                color: retailer.color,
-                expression: MascotExpression.joy,
-                haloColor: palette.lavender,
+              child: RetailerAvatar(
+                retailer: retailer,
+                size: 78,
+                showBorder: true,
               ),
             ),
             const SizedBox(height: 14),

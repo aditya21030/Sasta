@@ -111,23 +111,27 @@ class ProductCompareScreen extends StatelessWidget {
                                 ),
                               ),
                               const SizedBox(width: 10),
-                              Stack(
-                                clipBehavior: Clip.none,
-                                children: [
-                                  ProductArtTile(
-                                    kind: product.artKind,
-                                    pastel: product.pastel,
-                                    size: 76,
-                                  ),
-                                  const Positioned(
-                                    right: -6,
-                                    top: -6,
-                                    child: SastaSparkle(
-                                      size: 18,
-                                      color: SastaColors.sparkleOrange,
+                              SizedBox(
+                                width: 82,
+                                height: 82,
+                                child: Stack(
+                                  alignment: Alignment.center,
+                                  children: [
+                                    ProductArtTile(
+                                      kind: product.artKind,
+                                      pastel: product.pastel,
+                                      size: 72,
                                     ),
-                                  ),
-                                ],
+                                    const Positioned(
+                                      right: 0,
+                                      top: 0,
+                                      child: SastaSparkle(
+                                        size: 16,
+                                        color: SastaColors.sparkleOrange,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ],
                           ),
@@ -171,10 +175,10 @@ class ProductCompareScreen extends StatelessWidget {
                               padding: const EdgeInsets.symmetric(vertical: 4),
                               child: Row(
                                 children: [
-                                  SastaMascot(
-                                    size: 64,
-                                    color: cheapest.retailer.color,
-                                    expression: MascotExpression.joy,
+                                  RetailerAvatar(
+                                    retailer: cheapest.retailer,
+                                    size: 58,
+                                    showBorder: true,
                                   ),
                                   const SizedBox(width: 12),
                                   Expanded(
