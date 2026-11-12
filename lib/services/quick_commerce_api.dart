@@ -1498,11 +1498,7 @@ abstract final class QuickCommerceApiMapper {
     final rating = double.tryParse(map['rating']?.toString() ?? '');
     final ratingCount = int.tryParse(map['rating_count']?.toString() ?? '');
 
-    final rawImages = map['images'] as List<dynamic>? ?? const [];
-    final images = rawImages
-        .map((e) => e?.toString().trim() ?? '')
-        .where((s) => s.startsWith('http://') || s.startsWith('https://'))
-        .toList();
+    final images = _extractImageUrls(map);
 
     final pack = _normalizePack(map['quantity']?.toString() ?? '', fallbackName: name);
     final StockStatus stockStatus;
@@ -1550,6 +1546,45 @@ abstract final class QuickCommerceApiMapper {
       ratingCount: ratingCount,
       orderScore: orderScore,
     );
+  }
+
+  static List<String> _extractImageUrls(Map<String, dynamic> map) {
+    final out = <String>[];
+    void addCandidate(dynamic raw) {
+      String? url;
+      if (raw is String) {
+        url = raw.trim();
+      } else if (raw is Map) {
+        for (final k in const ['url', 'src', 'image', 'image_url', 'imageUrl']) {
+          final v = raw[k]?.toString().trim();
+          if (v != null && v.isNotEmpty) {
+            url = v;
+            break;
+          }
+        }
+      }
+      if (url == null || url.isEmpty) return;
+      if (url.startsWith('//')) {
+        url = 'https:$url';
+      }
+      if ((url.startsWith('https://') || url.startsWith('http://')) &&
+          !out.contains(url)) {
+        out.add(url);
+      }
+    }
+
+    final listRaw = map['images'] ?? map['imageUrls'] ?? map['image_urls'];
+    if (listRaw is List) {
+      for (final entry in listRaw) {
+        addCandidate(entry);
+      }
+    } else if (listRaw is String) {
+      addCandidate(listRaw);
+    }
+    for (final key in const ['image', 'image_url', 'imageUrl', 'thumbnail', 'thumb']) {
+      addCandidate(map[key]);
+    }
+    return out;
   }
 
   static int? _parseRupees(dynamic raw) {

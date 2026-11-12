@@ -753,7 +753,8 @@ class SastaAppState extends ChangeNotifier {
               apiKey: _apiKey,
             ),
           );
-        } else if (s.apiBaseUrl != null) {
+        } else if (s.apiBaseUrl != null &&
+            (_defaultApiConfig == null || !_defaultApiConfig.isConfigured)) {
           _apiBaseUrl = '';
           _apiKey = savedKey;
           _repository.dispose();
@@ -798,8 +799,8 @@ class SastaAppState extends ChangeNotifier {
             .where((p) => !p.isLiveProduct || p.id.startsWith(pinPrefix))
             .toList();
         _products = _mergeProductLists(matchingLive, _products);
-        if (_lastSyncedAt != null && _apiBaseUrl.isNotEmpty) {
-          _isLiveCatalogActive = matchingLive.isNotEmpty;
+        if (_lastSyncedAt != null && isApiConfigured) {
+          _isLiveCatalogActive = matchingLive.any((p) => p.isLiveProduct);
           _lastSyncedPincode = s.pincode ?? activeLocation.pincode;
           _lastSyncedRetailers = Set<RetailerId>.from(_enabledRetailers);
         }

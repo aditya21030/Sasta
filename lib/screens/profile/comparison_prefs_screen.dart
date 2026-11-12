@@ -47,11 +47,17 @@ class _ComparisonPrefsScreenState extends State<ComparisonPrefsScreen> {
 
   Future<void> _saveAndSyncApi() async {
     if (_savingApi) return;
+    var baseUrl = _baseUrlCtrl.text.trim();
+    final apiKey = _apiKeyCtrl.text.trim();
+    if (baseUrl.isEmpty && apiKey.isNotEmpty) {
+      baseUrl = 'https://api.quickcommerceapi.com';
+      _baseUrlCtrl.text = baseUrl;
+    }
     setState(() => _savingApi = true);
     final state = SastaScope.read(context);
     final synced = await state.updateApiConfig(
-      baseUrl: _baseUrlCtrl.text,
-      apiKey: _apiKeyCtrl.text,
+      baseUrl: baseUrl,
+      apiKey: apiKey,
       syncNow: true,
     );
     if (!mounted) return;
@@ -340,9 +346,23 @@ class _ComparisonPrefsScreenState extends State<ComparisonPrefsScreen> {
                           ),
                         ],
                         const SizedBox(height: 8),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: SastaChip(
+                            label: 'Use QuickCommerceAPI.com',
+                            height: 32,
+                            selected: _baseUrlCtrl.text.trim() ==
+                                'https://api.quickcommerceapi.com',
+                            onTap: () => setState(() {
+                              _baseUrlCtrl.text =
+                                  'https://api.quickcommerceapi.com';
+                            }),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
                         _ApiTextField(
                           controller: _baseUrlCtrl,
-                          hint: 'https://api.yourdomain.com',
+                          hint: 'https://api.quickcommerceapi.com',
                           label: 'Server URL',
                         ),
                         const SizedBox(height: 10),

@@ -132,6 +132,19 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                                         width: double.infinity,
                                         height: double.infinity,
                                         fit: BoxFit.contain,
+                                        loadingBuilder:
+                                            (context, child, progress) {
+                                          if (progress == null) return child;
+                                          return Container(
+                                            color: palette.lavender
+                                                .withValues(alpha: 0.35),
+                                            alignment: Alignment.center,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2.5,
+                                              color: palette.lavenderText,
+                                            ),
+                                          );
+                                        },
                                         errorBuilder: (_, _, _) => Container(
                                           color: palette.lavender,
                                           alignment: Alignment.center,

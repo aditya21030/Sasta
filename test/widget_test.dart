@@ -16,6 +16,7 @@ import 'package:sasta/models/models.dart';
 import 'package:sasta/screens/basket/basket_screen.dart';
 import 'package:sasta/screens/comparison/basket_compare_screen.dart';
 import 'package:sasta/screens/help_legal/help_centre_screen.dart';
+import 'package:sasta/screens/home/home_screen.dart';
 import 'package:sasta/screens/home/home_search_screen.dart';
 import 'package:sasta/screens/onboarding/pincode_screen.dart';
 import 'package:sasta/screens/profile/comparison_prefs_screen.dart';
@@ -1512,15 +1513,15 @@ void main() {
                       'offer_price': 22,
                       'available': true,
                       'deeplink': 'https://www.zepto.com/milk',
-                      'images': ['https://cdn.example.com/select_milk.jpg'],
-                      'platform': {'sla': '9 mins', 'open': true},
-                    },
-                  ],
-                },
-              }),
-              200,
-              headers: {'x-credits-remaining': '80'},
-            );
+                        'images': ['//cdn.example.com/select_milk.jpg'],
+                        'platform': {'sla': '9 mins', 'open': true},
+                      },
+                    ],
+                  },
+                }),
+                200,
+                headers: {'x-credits-remaining': '80'},
+              );
           }
           return http.Response('{}', 404);
         }),
@@ -1536,6 +1537,7 @@ void main() {
       final fetched = liveState.products.firstWhere(
         (p) => p.bestImageUrl != null,
       );
+      expect(fetched.bestImageUrl, 'https://cdn.example.com/select_milk.jpg');
 
       await tester.pumpWidget(
         SastaScope(
@@ -1553,6 +1555,54 @@ void main() {
       final detailsHeroImageSize = tester.getSize(networkImages.first);
       expect(detailsHeroImageSize.width, 204);
       expect(detailsHeroImageSize.height, 204);
+
+      // Verify HomeScreen IntrinsicHeight deals & unconfigured prompt work cleanly.
+      await tester.pumpWidget(
+        SastaScope(
+          state: liveState,
+          child: MaterialApp(
+            theme: buildSastaTheme(Brightness.light),
+            home: const Scaffold(body: SafeArea(child: HomeScreen())),
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(find.textContaining('Live prices updated'), findsOneWidget);
+
+      await tester.pumpWidget(
+        SastaScope(
+          state: state,
+          child: MaterialApp(
+            theme: buildSastaTheme(Brightness.light),
+            home: const Scaffold(body: SafeArea(child: HomeScreen())),
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(
+        find.text('Offline catalog · Tap to link live API key or proxy'),
+        findsOneWidget,
+      );
+
+      // Empty persisted snapshot from unconfigured build does not wipe build-time API config.
+      SharedPreferences.setMockInitialValues({});
+      final upgradeStorage = LocalStorageService();
+      final unconfiguredRun = await SastaAppState.createAndLoad(
+        storage: upgradeStorage,
+        syncIfConfigured: false,
+      );
+      await unconfiguredRun.flushPersistence();
+      unconfiguredRun.dispose();
+
+      final upgradedRun = await SastaAppState.createAndLoad(
+        storage: upgradeStorage,
+        defaultApiConfig: _testQuickCommerceConfig,
+        syncIfConfigured: false,
+      );
+      addTearDown(upgradedRun.dispose);
+      expect(upgradedRun.isApiConfigured, isTrue);
+      expect(upgradedRun.apiBaseUrl, 'https://api.quickcommerceapi.com');
+      expect(upgradedRun.apiKey, 'test-qc-api-key');
     },
   );
 }

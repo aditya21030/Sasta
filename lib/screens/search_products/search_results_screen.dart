@@ -328,8 +328,11 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
               Expanded(
                 child: results.isEmpty
                     ? Center(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 28),
+                        child: SingleChildScrollView(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 28,
+                            vertical: 16,
+                          ),
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
@@ -350,6 +353,32 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                                 style: SastaText.muted(context, size: 14),
                               ),
                               const SizedBox(height: 16),
+                              if (state.isApiConfigured &&
+                                  (_query.trim().isNotEmpty ||
+                                      (_categoryId?.isNotEmpty ?? false))) ...[
+                                SastaPrimaryButton(
+                                  label: state.isSearchingRemote
+                                      ? 'Searching live stores…'
+                                      : 'Fetch live store results',
+                                  onPressed: state.isSearchingRemote
+                                      ? null
+                                      : () => state.searchProductsRemote(
+                                            _query,
+                                            categoryId: _categoryId,
+                                            forceRefresh: true,
+                                          ),
+                                ),
+                                const SizedBox(height: 10),
+                              ] else if (!state.isApiConfigured) ...[
+                                SastaPrimaryButton(
+                                  label: 'Connect API for live search',
+                                  onPressed: () => SastaNav.push(
+                                    context,
+                                    SastaRouteNames.comparisonPrefs,
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                              ],
                               SastaChip(
                                 label: 'Reset filters',
                                 selected: true,

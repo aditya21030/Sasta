@@ -480,12 +480,17 @@ class Product {
       );
 
   String? get bestImageUrl {
-    if (imageUrl != null && imageUrl!.trim().isNotEmpty) return imageUrl;
-    if (imageUrls.isNotEmpty) return imageUrls.first;
+    final direct = imageUrl?.trim();
+    if (direct != null && direct.isNotEmpty) return direct;
+    for (final url in imageUrls) {
+      final trimmed = url.trim();
+      if (trimmed.isNotEmpty) return trimmed;
+    }
     for (final v in variants) {
       for (final q in v.quotes) {
-        if (q.imageUrl != null && q.imageUrl!.trim().isNotEmpty) {
-          return q.imageUrl;
+        final qUrl = q.imageUrl?.trim();
+        if (qUrl != null && qUrl.isNotEmpty) {
+          return qUrl;
         }
       }
     }

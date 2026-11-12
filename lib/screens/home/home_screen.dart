@@ -162,7 +162,9 @@ class HomeScreen extends StatelessWidget {
                       onTap: () => SastaNav.openHomeSearch(context),
                     ),
                   ),
-                  if (state.isCatalogSyncing || state.isLiveCatalogActive) ...[
+                  if (state.isCatalogSyncing ||
+                      state.isLiveCatalogActive ||
+                      !state.isApiConfigured) ...[
                     const SizedBox(height: 10),
                     GestureDetector(
                       onTap: () => SastaNav.push(
@@ -174,7 +176,9 @@ class HomeScreen extends StatelessWidget {
                           Icon(
                             state.isCatalogSyncing
                                 ? Icons.sync_rounded
-                                : Icons.cloud_done_rounded,
+                                : state.isLiveCatalogActive
+                                    ? Icons.cloud_done_rounded
+                                    : Icons.cloud_off_rounded,
                             size: 14,
                             color: state.isLiveCatalogActive
                                 ? palette.successText
@@ -185,7 +189,9 @@ class HomeScreen extends StatelessWidget {
                             child: Text(
                               state.isCatalogSyncing
                                   ? 'Checking store prices for ${state.activeLocation.pincode}…'
-                                  : 'Live prices updated · ${state.activeLocation.area}',
+                                  : state.isLiveCatalogActive
+                                      ? 'Live prices updated · ${state.activeLocation.area}'
+                                      : 'Offline catalog · Tap to link live API key or proxy',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: SastaText.body(

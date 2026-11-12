@@ -132,6 +132,21 @@ class ProductGridCard extends StatelessWidget {
                         width: double.infinity,
                         height: double.infinity,
                         fit: BoxFit.contain,
+                        loadingBuilder: (context, child, progress) {
+                          if (progress == null) return child;
+                          return Container(
+                            color: palette.pastel(product.pastel).withValues(alpha: 0.45),
+                            alignment: Alignment.center,
+                            child: SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: palette.pastelAccent(product.pastel),
+                              ),
+                            ),
+                          );
+                        },
                         errorBuilder: (_, _, _) => Container(
                           color: palette.pastel(product.pastel),
                           alignment: Alignment.center,

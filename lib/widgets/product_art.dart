@@ -57,6 +57,18 @@ class ProductArtTile extends StatelessWidget {
               width: double.infinity,
               height: double.infinity,
               fit: BoxFit.contain,
+              loadingBuilder: (_, child, progress) {
+                if (progress == null) return child;
+                return Container(
+                  color: bg.withValues(alpha: 0.45),
+                  alignment: Alignment.center,
+                  child: SizedBox(
+                    width: size * 0.28,
+                    height: size * 0.28,
+                    child: const CircularProgressIndicator(strokeWidth: 1.8),
+                  ),
+                );
+              },
               errorBuilder: (_, _, _) => Container(
                 color: bg,
                 alignment: Alignment.center,
